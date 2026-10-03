@@ -125,3 +125,9 @@ retrieval/model boundaries, correction history, scoring delegation and the compl
 Reference documentation: [FastAPI testing](https://fastapi.tiangolo.com/tutorial/testing/),
 [lifespan testing](https://fastapi.tiangolo.com/advanced/testing-events/), and
 [Python SQLite transactions](https://docs.python.org/3/library/sqlite3.html).
+
+## Separate model/RAG module
+
+See [MODEL_RAG.md](MODEL_RAG.md) for the existing isolated inference module.
+The conversation backend currently uses `OmlxAdapter`; this merge does not wire
+the separate retrieval/interpreter service into the conversation flow.

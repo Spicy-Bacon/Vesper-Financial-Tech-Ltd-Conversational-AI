@@ -1,0 +1,13 @@
+[project]
+name = "vesper-model-rag"
+version = "0.1.0"
+description = "Isolated question-scoped retrieval and model interpretation"
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.12,<3", "httpx>=0.28,<1"]
+
+[dependency-groups]
+dev = ["pytest>=8,<10"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
