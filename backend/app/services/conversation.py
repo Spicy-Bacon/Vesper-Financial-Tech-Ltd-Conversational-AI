@@ -15,7 +15,7 @@ from ..schemas import (
 from .rules import approved_catalog, canonical_proposal, confirm_proposal, next_question, question_for
 from .scoring import ScoringService
 from ..schemas.v1 import (
-    ConfirmationCommand, MessageCommand, SessionCommand, SessionSnapshot,
+    ConfirmationCommand, FinalizeCommand, MessageCommand, SessionCommand, SessionSnapshot,
     frontend_catalog, snapshot_for,
 )
 
@@ -97,7 +97,8 @@ class ConversationService:
             canMessage=response.canMessage, assistantMessage=response.assistant.text,
             proposalId=str(uuid4()) if response.proposal else None,
             proposalOrigin="demo" if isinstance(self.model, ScriptedDemoAdapter) else "model",
-            reviewVersion=str(uuid4()) if response.type == "final_playback" else None,
+            reviewVersion=(str(uuid4()) if response.type == "final_playback"
+                           else state.get("reviewVersion") if response.type == "saved" else None),
         )
         self.repository.store_session(db, request.sessionId, state)
         if cache_request:
@@ -121,7 +122,7 @@ class ConversationService:
         self, action: str, command: SessionCommand, session_id: str | None = None,
     ) -> SessionSnapshot:
         """Translate commands, then use _send/_advance in the same SQLite transaction."""
-        if action not in {"start", "message", "confirm"}:
+        if action not in {"start", "message", "confirm", "finalize"}:
             raise ConversationError(422, "This versioned action is not implemented.")
         with self.repository.transaction() as db:
             if action == "start":
@@ -157,9 +158,13 @@ class ConversationService:
                     questionId=state["proposal"]["questionId"], optionId=state["proposal"]["optionId"],
                     explicitConfirmation=command.explicit_confirmation,
                 )
+            elif action == "finalize":
+                assert isinstance(command, FinalizeCommand)
+                if state["type"] != "final_playback" or command.review_version != state["reviewVersion"]:
+                    raise ConversationError(422, "Review the current final playback before saving.")
             self._send(ConversationRequest(
                 sessionId=session_id, requestId=command.request_id, revision=command.expected_revision,
-                action=action, **extra,
+                action="save" if action == "finalize" else action, **extra,
             ), db, cache_request=False)
             state = self.repository.load_session(db, session_id)
             state["apiVersion"] = 1
@@ -264,6 +269,7 @@ class ConversationService:
                 demo=catalog.demo, answers=answers, score=score, createdAt=now,
             )
             self.repository.save(db, profile)
+            state["acceptedProfile"] = profile.model_dump(mode="json")
             response_type = "saved"
             save_status = "saved"
             can_message = False

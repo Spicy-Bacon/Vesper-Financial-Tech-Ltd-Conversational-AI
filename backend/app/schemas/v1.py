@@ -2,12 +2,13 @@
 
 No financial wording, option meaning or retrieval provenance is inferred here.
 """
+from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import Field
 
 from ..errors import IntegrationUnavailable
-from . import Answer, Catalog, Identifier, Schema, Text
+from . import Answer, Catalog, Identifier, Profile, Schema, Text
 
 
 class SessionCommand(Schema):
@@ -22,6 +23,10 @@ class MessageCommand(SessionCommand):
 class ConfirmationCommand(SessionCommand):
     proposal_id: Identifier
     explicit_confirmation: bool = Field(default=False, strict=True)
+
+
+class FinalizeCommand(SessionCommand):
+    review_version: Text
 
 
 class OptionSnapshot(Schema):
@@ -151,6 +156,7 @@ def snapshot_for(session_id: str, state: dict) -> SessionSnapshot:
     }.get(state["type"], state["type"])
     review = None
     review_version = None
+    receipt = None
     if state["proposal"]:
         value = state["proposal"]
         option = next(o for o in current.options if o.id == value["optionId"])
@@ -164,13 +170,22 @@ def snapshot_for(session_id: str, state: dict) -> SessionSnapshot:
         stage, actions = "PAUSED", []
         active = None
     elif state["type"] == "final_playback":
-        stage, actions = "REVIEW", []
+        stage, actions = "REVIEW", ["finalize"]
         active = None
         review_version = state["reviewVersion"]
         review = ReviewSnapshot(statements=answers, help_text=state["assistantMessage"])
     elif state["type"] == "saved":
-        # V1 does not expose saving or convert a legacy receipt in this milestone.
-        raise IntegrationUnavailable()
+        stage, actions = "SAVED", []
+        active = None
+        review_version = state["reviewVersion"]
+        profile = Profile.model_validate(state["acceptedProfile"])
+        receipt = ProfileSnapshot(
+            profile_id=profile.id, session_id=profile.sessionId,
+            catalog_version=profile.catalogVersion, review_version=review_version,
+            accepted_at=datetime.fromtimestamp(profile.createdAt, timezone.utc).isoformat(),
+            simulated=False,
+            answers=[answer(a.model_dump(mode="json")) for a in profile.answers],
+        )
     else:
         stage = "ASKING"
         actions = ["message"] if state["canMessage"] else []
@@ -180,5 +195,5 @@ def snapshot_for(session_id: str, state: dict) -> SessionSnapshot:
         state=stage, active_question=active, pending_proposal=pending,
         confirmed_answers=answers, assistant_message=state["assistantMessage"],
         response_type=response_type, allowed_actions=actions,
-        review_version=review_version, review=review, receipt=None,
+        review_version=review_version, review=review, receipt=receipt,
     )

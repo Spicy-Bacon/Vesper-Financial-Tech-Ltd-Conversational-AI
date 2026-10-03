@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Header, Request
 
 from ..errors import ConversationError
-from ..schemas.v1 import ConfirmationCommand, MessageCommand, SessionCommand, SessionSnapshot
+from ..schemas.v1 import ConfirmationCommand, FinalizeCommand, MessageCommand, SessionCommand, SessionSnapshot
 
 router = APIRouter(prefix="/api/v1", tags=["sessions-v1"])
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=128)]
@@ -36,3 +36,9 @@ def message(session_id: str, body: MessageCommand, request: Request, idempotency
 def confirm(session_id: str, body: ConfirmationCommand, request: Request, idempotency_key: Key):
     check_key(body, idempotency_key)
     return request.app.state.conversation.send_v1("confirm", body, session_id)
+
+
+@router.post("/sessions/{session_id}/finalize", response_model=SessionSnapshot)
+def finalize(session_id: str, body: FinalizeCommand, request: Request, idempotency_key: Key):
+    check_key(body, idempotency_key)
+    return request.app.state.conversation.send_v1("finalize", body, session_id)

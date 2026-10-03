@@ -349,7 +349,7 @@ def test_confirmed_unsure_is_explicit_and_six_answers_produce_valid_read_only_re
         proposal = v1.propose("u" if index == 0 else "a")
         assert len(proposal["confirmed_answers"]) == index
         final = v1.confirm()
-    assert final["state"] == "REVIEW" and final["allowed_actions"] == []
+    assert final["state"] == "REVIEW" and final["allowed_actions"] == ["finalize"]
     assert final["review"]["statements"] == final["confirmed_answers"]
     assert final["confirmed_answers"][0]["is_unsure"] is True
     assert final["review_version"] and final["receipt"] is None
@@ -423,7 +423,8 @@ def test_invalid_creation_payloads_are_safe(v1, bad):
 def test_only_four_routes_and_protocols_cannot_mutate_each_others_sessions(v1, v1_app):
     paths = {path for path in v1_app.openapi()["paths"] if path.startswith("/api/v1")}
     assert paths == {"/api/v1/sessions", "/api/v1/sessions/{session_id}",
-                     "/api/v1/sessions/{session_id}/messages", "/api/v1/sessions/{session_id}/confirmations"}
+                     "/api/v1/sessions/{session_id}/messages", "/api/v1/sessions/{session_id}/confirmations",
+                     "/api/v1/sessions/{session_id}/finalize"}
     initial = v1.send("start")
     body = {"sessionId": initial["session_id"], "requestId": "legacy-command", "revision": 1,
             "action": "message", "message": {"text": "a"}}
