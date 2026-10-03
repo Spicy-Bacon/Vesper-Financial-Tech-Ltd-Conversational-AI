@@ -1,45 +1,75 @@
 # The Careful Conversation
 
-A responsive conversation frontend for the Vesper hackathon. The original repository contained only its title: no framework, backend, model service, profiling rules or detector was present. This implementation uses native JavaScript and CSS with npm and no dependencies. Model access belongs to the backend teammate.
+Shared baseline for the Vesper hackathon: the React/TypeScript/Vite frontend, FastAPI conversation backend, and existing model/RAG module. The frontend targets **Careful Conversation Product and Build Spec v1.0 (3 October 2026)**.
+
+The frontend expects `/api/v1`; the backend currently implements `/api/conversation`. They are not yet connected. CS2 will adapt the backend to [API.md](API.md). The backend currently uses `OmlxAdapter`; the separate model/RAG module is not wired into that flow.
+
+## Team services
+
+| Service | Address | Current use |
+| --- | --- | --- |
+| Frontend | http://localhost:5173 | React/Vite, scripted demo by default |
+| Backend | http://127.0.0.1:8001 | Existing conversation API and `/docs` |
+| oMLX | http://127.0.0.1:8000 | Separately installed local model server |
+
+## Backend setup
+
+Use Python 3.11+ from the repository root. On macOS/Linux:
+
+```sh
+python3 -m venv backend/.venv
+backend/.venv/bin/python -m pip install -r backend/requirements-dev.txt 'pydantic>=2.12,<3'
+VESPER_SERVE_FRONTEND=0 VESPER_DEMO=1 VESPER_MODEL_BACKEND=unconfigured backend/.venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8001 --no-access-log
+```
+
+Open http://127.0.0.1:8001/docs for the fictional backend API. Run `backend/.venv/bin/python -m pytest backend/tests -q` for the combined backend/model tests. The Pydantic minimum also satisfies `backend/pyproject.toml`; that file and its uv lock describe the isolated model module, not the full FastAPI environment.
+
+See [backend/README.md](backend/README.md) for PowerShell and oMLX setup and [backend/MODEL_RAG.md](backend/MODEL_RAG.md) for the existing inference module. Model credentials stay in ignored server-side configuration. The legacy root web app was removed by the frontend branch; keep `VESPER_SERVE_FRONTEND=0`, including in any existing root `.env`.
 
 ## Run
 
-Use Node.js 22 or newer:
+Use Node.js 22.12+ and npm. From the repository root:
 
 ```sh
+npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. No install is needed. `npm run check`, `npm test` and `npm run build` run syntax checks, adapter tests and create a static `dist/` directory. `SERVE_DIST=1 npm run dev` previews the build. The development server serves frontend files only.
+Open http://127.0.0.1:5173. Default mode is visibly labelled **Scripted demo**. Only `demo` and `http` are valid modes; a typo displays a configuration error and sends no conversation requests. All content is synthetic and provisional. Free text is not interpreted by a model; use the fixed options to complete the demo.
 
-## Demo and walkthrough
+```sh
+npm run check         # TypeScript
+npm test              # Contract and mock-adapter tests
+npm run build         # frontend/dist; suitable for FastAPI static serving
+npm run test:browser  # Playwright; requires installed Google Chrome
+```
 
-Default: **Demo mode**, with scripted synthetic answers, no LLM and no real saving. It does not interpret the text you type. Please use fictional circumstances.
+Browser tests start isolated Vite instances on ports 5173 and 5174 and use isolated Chrome profiles. Close existing servers on those ports first. They use synthetic data and stub HTTP responses; they do not prove that a real backend/model works. Playwright screenshots go to the macOS temporary directory. Safari, Firefox and screen-reader verification remain manual.
 
-1. Type “I can handle some ups and downs”. Review and Confirm the fixed proposal.
-2. Type “Maybe in a few years”. The demo asks for clarification. Choose the five-year example, then Confirm.
-3. Type a fictional answer about essential spending. Check the additional safety confirmation before Confirm.
-4. On final playback, choose Change an answer, then Attitude to risk. Its confirmation is removed immediately. Choose the alternative demo answer, then Confirm again.
-5. Review final playback and choose Accept and save. The acknowledgement explicitly says saving was simulated.
+## What is implemented
 
-You can also choose Change answer or Not sure on a proposal. Stop cancels the browser request and prevents further interaction until Restart. Restart uses a native confirmation dialog; Escape cancels it. Enter sends, Shift+Enter adds a line, and IME composition does not send. Long transcripts scroll independently and do not automatically jump when you are reading earlier messages.
+- Start, Q1–Q6 conversation and fixed options, approved-text explanation rendering, proposal confirmation, Q7 review, per-answer editing, Pause/Resume, End and acceptance receipt.
+- Every option, including Unsure, requires explicit confirmation. Q3–Q5 require an extra checkbox. Unsure stays visibly unresolved in the review; refusal leaves the session incomplete.
+- Proposed, confirmed and accepted records stay distinct. Corrections remove the edited confirmation and old review; Pause clears unconfirmed proposals; resume re-asks or rebuilds review.
+- Versioned `/api/v1` adapter: request IDs, expected revision, proposal IDs and exact review versions. Retries reuse the same request without duplicating messages. Pause/End can interrupt a pending request; stale browser replies are discarded.
+- Temporary audit panel with separate raw reply, retrieved snippets, model action, validation and confirmation fields. Demo events are labelled synthetic and show no live model call.
+- Accepted-profile export only after a receipt, with simulated exports clearly named. Audit export is a separate explicit action with a warning that it includes messages.
+- Keyboard controls, native confirmation dialogs, mobile layout, in-memory state and no analytics or conversation logging.
 
-State exists only in memory. Refreshing loses the session. Conversation content is not written to local storage, analytics or console logs. Restart is not deletion of a profile already saved by a real backend. Stopping a browser request cannot undo an operation already accepted by a backend; a pending save is reported as unknown.
+## Target FastAPI integration
 
-## Connect the backend
+After CS2 implements the target contract, copy `frontend/.env.example` to `frontend/.env.local`, set `VITE_API_MODE=http`, and restart Vite. Run FastAPI on port **8001**; Vite proxies `/api` to that port. Until then, keep demo mode to exercise the React UI. The browser never calls the model server (oMLX on port 8000 in the team plan).
 
-Edit `src/config.js`: set `mode: 'http'` and the endpoint (default `/api/conversation`). Serve the frontend and API on the same origin or provide an appropriate development reverse proxy. The supplied development server does not proxy requests. There is no automatic fallback from the real service to synthetic answers.
+[API.md](API.md) documents the exact frontend contract. The PDF supplies routes and a partial snapshot; [frontend/src/api/contracts.ts](frontend/src/api/contracts.ts) defines the additional render fields that the backend teammate must agree and return. Use `allowed_actions` and the returned snapshot as the source of truth. No model credentials belong in Vite variables.
 
-All communication goes through `src/service.js`. See [API.md](API.md) for the proposed JSON contract, action IDs, idempotency requirements and save rules. Keep Ollama calls, model configuration and credentials on the server. This is public browser configuration; no secrets belong here. No streaming is implemented because no streaming contract exists.
+The backend must enforce state transitions, proposal/review matching, atomic idempotency, catalog approval, session expiry and accepted-only persistence. A frontend pause cancels a fetch but cannot undo server work. The UI reloads session state before sending pause/end; the backend must still reject stale mutations and discard delayed model output. Saved profiles remain saved when the screen is restarted.
 
-The backend owns question wording and options, interpretation, deterministic validation, session state, confirmation invalidation, final playback and persistence. The frontend never calculates a financial classification. Optional findings are rendered only when returned; no detector is implemented and absence of findings is never described as compliance.
+The live adapter accepts a real save only with a matching receipt and approved catalog. It does not fall back to demo responses when the backend is unavailable. Fixed-option fallback must be returned in a valid snapshot by the backend when model inference fails. For transport failure, Retry or Refresh session state first to avoid using an unknown revision. Missing or expired sessions have a local Return to start action. That clears the screen without pretending to delete server data or undo a save. A catalog-version change within a session is rejected and also requires a fresh start.
 
-## Layout and accessibility
+## Provisional content and remaining handoff
 
-Calm green and neutral layout with user/assistant labels, labelled input, visible keyboard focus, live response/loading/error announcements, native restart dialog and explicit safety checkbox. Desktop has an answer summary beside the conversation; phone uses one column. The app uses system fonts and has no external asset requests.
+The approved workbook is not present. `frontend/src/api/fixtures.ts` contains six **UI development placeholders**, not reconstructed workbook policy. Q1–Q6 question IDs are preserved, while option IDs are explicitly namespaced `demo_Q…` so they cannot be mistaken for finance-approved options. Replace these only through the backend's approved catalog release; the live UI has no hardcoded financial mapping or risk calculation.
 
-## Verification
+See [docs/spec-alignment.md](docs/spec-alignment.md) for scope, missing decisions and changes from the first frontend. The PDF's whole-system paste-ready implementation prompt was not treated as authority to build the backend or model service. [docs/demo-script.md](docs/demo-script.md) gives a short walkthrough.
 
-Passed: syntax checks, five Node adapter tests, static build, and automated Chrome checks at 1280px and 390px. The browser checks cover the complete demo, correction, mandatory safety checkbox, simulated save, Enter/Shift+Enter, Escape in the restart dialog, stop, long-message overflow, and HTTP error/retry without duplicated messages or confirmations. Desktop and phone screenshots were visually inspected. Screen-reader testing and Safari/Firefox testing remain manual checks.
-
-To repeat the browser checks, run the development server and a separate Chrome instance with `--headless --remote-debugging-port=9223 --user-data-dir=/tmp/careful-test-chrome about:blank`, then run `node scripts/browser-check.mjs`. The script uses Node's built-in WebSocket and an isolated Chrome debugging page; no browser-test dependencies are installed. It injects synthetic HTTP failures only into that test page. Screenshots are written to `/private/tmp/careful-desktop.png` and `/private/tmp/careful-mobile.png` on macOS. Use an isolated Chrome profile, not your personal browsing session.
+No real usability sessions, model accuracy, regulatory compliance, actual saves or model-server retention have been verified. The prototype uses fictional circumstances throughout.

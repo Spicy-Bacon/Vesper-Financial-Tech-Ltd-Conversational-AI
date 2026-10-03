@@ -2,3 +2,12 @@ dist/
 node_modules/
 .env
 .DS_Store
+__pycache__/
+.pytest_cache/
+backend/.venv/
+backend/data/
+.env.*
+!.env.example
+test-results/
+playwright-report/
+*.tsbuildinfo
