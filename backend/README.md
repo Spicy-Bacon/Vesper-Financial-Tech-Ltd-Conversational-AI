@@ -1,234 +1,133 @@
-# Model + question-scoped RAG
+# Conversation backend
 
-This module ends at the inference boundary. It retrieves reviewed explanation
-snippets, calls a local OpenAI-compatible model, validates the result, and returns
-an `InferenceOutcome`. It has no routes, session state, confirmation, persistence,
-scoring, importer, or frontend code.
+FastAPI orchestration matching the frontend snapshot contract in [API.md](../API.md).
+Harry/CS3 own the real catalog importer, retrieval and model adapter. Finance owns approved
+question meanings, option meanings, safety requirements, points and formulas. The backend
+contains no financial scoring formula.
 
-The intended connection is browser → FastAPI **:8001** → this module → oMLX
-**:8000**. Keep the model endpoint and credentials on the backend. The frontend
-branch uses `/api/v1`; these are internal Python interfaces, not new HTTP routes.
+## Run the fictional backend demo (PowerShell, from the repository root)
 
-## Setup and tests
-
-Python **3.11+**. From the repository root, using [uv](https://docs.astral.sh/uv/):
-
-```sh
-uv sync --project backend --locked
-backend/.venv/bin/python -m pytest -q backend/tests
-git diff --check
+```powershell
+python -m venv backend/.venv
+& .\backend\.venv\Scripts\python.exe -m pip install -r backend/requirements-dev.txt
+$env:VESPER_DEMO = '1'
+$env:VESPER_MODEL_BACKEND = 'unconfigured'
+& .\backend\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8765 --no-access-log
 ```
 
-`backend/uv.lock` pins the dependencies. `pyproject.toml` contains only Pydantic,
-HTTPX and pytest; there is no application framework setup. Tests use scripted
-responses and `httpx.MockTransport`, and need no running server. Run pytest from
-the backend directory with `.venv/bin/python -m pytest -q` if preferred.
+The environment is already installed in this workspace. If `python` is missing from PATH,
+use the full path to your installed Python for the first command. No activation is required.
+For the exact tested Windows/Python 3.13 environment, install `backend/requirements-lock.txt`
+instead of the ranged development requirements.
 
-## Configuration and manual probe
+Open **http://127.0.0.1:8765/** to try the existing frontend against this backend. This origin
+serves a public HTTP configuration override; `src/config.js` is unchanged. Port 5173 remains
+the original browser-only scripted demo. Set `VESPER_SERVE_FRONTEND=0` for API-only hosting.
+Interactive API documentation is at `/docs`; the demo catalog is at `/api/catalog`.
 
-Export environment variables in your shell. `.env.example` is a reference;
-neither the module nor the probe automatically reads `.env` files.
+Demo selections are exact option IDs, not natural-language interpretation:
 
-| Variable | Behavior |
-| --- | --- |
-| `MODEL_BASE_URL` | Defaults to `http://127.0.0.1:8000/v1`; include `/v1`. No URL credentials, query or fragment. |
-| `MODEL_ID` | No executable default. Use the exact ID returned by `GET /v1/models`. |
-| `MODEL_API_KEY` | Optional bearer key; excluded from config serialization and repr. |
-| `MODEL_TIMEOUT_SECONDS` | Defaults to 30; positive and at most 120 seconds per attempt. |
-| `MODEL_JSON_MODE` | Defaults to `false`. Set `true` only after verifying `response_format: {"type":"json_object"}` support. |
+1. `some_fluctuation` or `less_fluctuation`, then Confirm.
+2. `five_plus` or `within_three`, then Confirm.
+3. `essentials_covered` or `essentials_affected`, then explicitly confirm.
+4. Review and save. Fictional answers are actually saved in local SQLite, marked `demo=true`.
+   No financial score or classification is produced. Edit an answer to create a new accepted version.
 
-First discover your model IDs:
+`VESPER_DEMO` defaults to off. Without configured integrations, `/api/conversation`, `/api/catalog`
+and `/ready` return 503. `/health` reports process liveness. `/ready` checks that dependencies
+are wired; it does not probe model/retrieval connectivity. The real composition root should call
+`create_app(catalog=..., model=..., retrieval=..., finance_policy=...)`. See
+[INTEGRATIONS.md](INTEGRATIONS.md) for the proposed handoff contracts.
 
-```sh
-MODEL_BASE_URL=http://127.0.0.1:8000/v1 MODEL_ID= \
-  backend/.venv/bin/python backend/scripts/probe_model.py
+## Connect the provided oMLX model
+
+The ignored root `.env` configures the server-only key, base URL and model. OS environment
+variables override that file. `.env.example` documents the names with a placeholder key.
+For model-assisted testing with the fictional catalog, set:
+
+```ini
+OMLX_BASE_URL=http://127.0.0.1:8000/v1
+OMLX_MODEL=Qwen3.8-27B-MLX-4bit
+VESPER_MODEL_BACKEND=omlx
+VESPER_DEMO=0
+VESPER_DEMO_CATALOG=1
 ```
 
-Then run the probe with the actual discovered ID:
+Keep `OMLX_API_KEY` in `.env`. Run the same Uvicorn command on port 8765, without setting
+`VESPER_DEMO=1`. If you previously ran the scripted demo, clear those shell overrides with
+`Remove-Item Env:VESPER_DEMO,Env:VESPER_MODEL_BACKEND -ErrorAction SilentlyContinue`.
+The model-assisted demo asks natural-language questions. Only suggestions are model-generated;
+canonical wording, safety confirmation, final acceptance and persistence stay in the backend.
+The catalog and all profiles remain explicitly fictional, with no Finance scoring.
 
-```sh
-MODEL_BASE_URL=http://127.0.0.1:8000/v1 MODEL_ID='EXACT_ID_FROM_DISCOVERY' \
-  backend/.venv/bin/python backend/scripts/probe_model.py
+Check reachability and the exact model ID without sending conversation text:
+
+```powershell
+& .\backend\.venv\Scripts\python.exe -m backend.scripts.check_omlx
 ```
 
-The second command contains a placeholder to replace, not a suggested model.
-Set `MODEL_API_KEY` separately if your server requires it. The probe lists available
-IDs, requires an exact match, then sends **one** synthetic completion request with
-no retry. It uses the production parser, including option and evidence checks.
-Output includes base URL, model ID, success/failure, total discovery/completion
-latency and parsed action. It does not print keys, raw responses, replies or hidden
-reasoning. Exit codes: 0 success, 1 model/output failure, 2 configuration/discovery
-selection required. No live oMLX verification is implied by unit test results.
+oMLX normally runs on an Apple Silicon Mac. `127.0.0.1` refers to the computer running this
+Python backend. If oMLX is on another computer, use a reachable hostname/IP or an authenticated
+local tunnel in `OMLX_BASE_URL`. A 404 from `/v1/models` means the configured address is not
+serving the expected endpoint. Keep the backend on port 8765 and oMLX on its own port.
 
-## Public contracts and backend integration
+The adapter sends non-streaming `/v1/chat/completions`, requests JSON output, disables thinking
+through `chat_template_kwargs`, and independently validates model JSON/option IDs. HTTP errors,
+timeouts, oversized responses, truncated output and invalid JSON return 503; there is no scripted
+fallback. It uses a 3-second connect and 12-second per-operation timeout, with no automatic HTTP
+retry. First model loading may need to complete in oMLX before trying the conversation.
+This thin client can be replaced by Harry/CS3 through the existing `ModelAdapter` interface.
+See [oMLX's official API schemas](https://github.com/jundot/omlx/blob/main/omlx/api/openai_models.py)
+and [server setup](https://github.com/jundot/omlx#quickstart).
 
-Contracts are in `app.schemas.inference`; services are in `app.services`.
+## API and persistence
 
-```python
-from app.services.retrieval import QuestionScopedRetriever
-from app.services.model_client import Interpreter, LocalModelClient, ModelConfig
+- `POST /api/conversation`: body and `Idempotency-Key` must share `requestId`.
+- `GET /api/catalog`: active public question catalog, with version/approval/demo metadata.
+- `GET /health`, `GET /ready`: liveness and configuration checks.
 
-# explanation_records: iterable[ExplanationRecord], from the catalog owner.
-# question: InferenceQuestion, from the session's pinned catalog version.
-retriever = QuestionScopedRetriever(explanation_records)
-retrieval = retriever.retrieve(
-    catalog_version=question.catalog_version,
-    question_id=question.question_id,
-    user_reply=text,
-)
+Each session pins its catalog at start and expires after one hour (configurable through
+`create_app(session_ttl=...)`). Unknown sessions return 404, expired new work 410, revision/key
+conflicts 409 and invalid inputs/actions 422. Exact successful retries return their original
+snapshot even after the session revision advances or expires. Failed requests have no cached
+success and may retry with the same key. All responses use `Cache-Control: no-store`.
 
-# In async backend code. Reuse the client across calls and close at shutdown.
-async with LocalModelClient(ModelConfig.from_env()) as client:
-    interpreter = Interpreter(client)
-    outcome = await interpreter.interpret(
-        question=question,
-        options=question.options,
-        user_reply=text,
-        retrieval=retrieval,
-    )
+The database defaults to `backend/data/profiles.sqlite3`; set `VESPER_DB_PATH` to override it.
+Session state, deduplication records and immutable profile versions commit together using
+SQLite `BEGIN IMMEDIATE`. Save acknowledges only after commit. A profile records the exact
+accepted revision, catalog version, canonical confirmed answers and versioned Finance result
+(or explicit `not_configured`). Changing an answer removes its confirmation and requires a new
+final review. Historical accepted profiles remain unchanged.
+
+This local implementation serializes writes across the database, including adapter calls.
+Adapters must enforce bounded network timeouts below the frontend's 20-second timeout; SQLite
+lock acquisition waits up to five seconds and returns retryable 503 on contention. This is a
+low-volume local design, not a high-throughput deployment. Sessions use opaque identifiers as
+local capabilities; authentication/authorization, retention/deletion and production hosting
+remain separate integration work. There is no public profile-read route. Request validation
+errors do not echo user input. Run without access logs as above to avoid logging URL identifiers.
+
+## Test
+
+```powershell
+& .\backend\.venv\Scripts\python.exe -m pytest backend/tests -q
 ```
 
-The example is an integration fragment; the caller supplies `question`, `text`
-and records. No runtime catalog loader or synthetic fallback catalog is installed.
-Import `app` with `backend/` on Python's module path (or run from `backend/`).
+With the demo server running, `node backend/scripts/check-demo.mjs` verifies the complete
+HTTP journey against the frontend's actual response validator. It saves one marked fictional
+test profile in the local demo database.
 
-### Catalog projection
+Tests use synthetic catalogs and policy outputs, not Finance-approved formulas. They cover API
+validation, canonical proposals, explicit safety confirmation, pause/resume, revisions, key
+reuse, concurrent requests, rollback, persistence across restarts, expiry, catalog pinning,
+retrieval/model boundaries, correction history, scoring delegation and the complete backend demo.
 
-- `InferenceQuestion(catalog_version, question_id, text, options, help_text=None)`:
-  use a direct catalog lookup. Question text is capped at 1,200 characters.
-- `AllowedOption(question_id, option_id, label, playback=None, is_unsure=False)`:
-  pass **every** allowed option, including Unsure. The explicit `question_id`
-  establishes ownership; IDs are opaque and no ID prefix is guessed. The frontend's
-  option shape has no `question_id`; the backend adds it from the owning catalog
-  question. Supply approved playback/help when available; missing text stays null.
-- `ExplanationRecord(content_id, text, source_sheet, source_row, catalog_version,
-  question_id, approval_status, retrievable)`: the catalog owner supplies approval
-  metadata. Status is `approved`, `draft`, `unapproved` or `retired`. Keep unreviewed
-  content unapproved and do not set approval merely to make retrieval return data.
-  The source must be exactly `Explanations` to be retrievable.
+Reference documentation: [FastAPI testing](https://fastapi.tiangolo.com/tutorial/testing/),
+[lifespan testing](https://fastapi.tiangolo.com/advanced/testing-events/), and
+[Python SQLite transactions](https://docs.python.org/3/library/sqlite3.html).
 
-Identifiers are nonblank, contain no whitespace and are capped at 160 characters.
-Snippet/help/label/playback/evidence fields are capped at 600 characters. Catalog
-records exceeding the cap are rejected, not silently truncated: the catalog owner
-must provide suitably short reviewed content. Replies are capped at 4,000
-characters; 1–20 options are supported. All Pydantic contracts forbid extra fields
-and coercion. Project explicitly from catalog/API models rather than passing their
-unrelated fields. The input enforces the exact question/version and complete,
-unchanged option set; invalid caller data raises `ValidationError` before any model
-call. This is a caller integration error, distinct from a model fallback.
+## Separate model/RAG module
 
-The caller is responsible for supplying trusted catalog metadata and the result
-from this retriever. An arbitrary object marked `approved`, or a hand-built snippet
-with false provenance, is not evidence of approval. There is no approval authority
-or manifest verification in this slice.
-
-### Retrieval and decisions
-
-`QuestionScopedRetriever.retrieve(*, catalog_version, question_id, user_reply)`
-returns `RetrievalResult(catalog_version, question_id, snippets, retrieval_method)`.
-Every snippet retains `content_id`, `text`, `source_sheet` and positive `source_row`.
-Hard filters require exact version, question, approved status, `retrievable=True`
-and the `Explanations` source sheet. Evaluation/persona/issue/mapping sheets are
-excluded even if their flags incorrectly say approved. Duplicate content IDs in
-one question/version are rejected.
-
-After filtering, retrieval ranks by case-insensitive overlap of non-stopword
-tokens; ties use source row then content ID. With no meaningful match it uses that
-same source order. At most three snippets are returned; an empty set stays empty.
-Methods are `question_scoped_lexical`, `question_scoped_order`, and
-`question_scoped_empty`. Retrieval never chooses a question or changes options.
-The small question-scoped explanation set needs no embeddings or vector database.
-
-`Interpreter.interpret(...)` is async and returns:
-
-```text
-InferenceOutcome:
-  retrieval: RetrievalResult
-  decision: ModelDecision | None
-  model_id: str | None
-  latency_ms: int                 # full inference time, including any retry
-  fallback_reason: str | None
-  retry_count: 0 | 1
-```
-
-`ModelDecision` requires all six JSON fields: `action`, `option_id`,
-`evidence_quote`, `clarification_question`, `explanation_content_ids`,
-`support_reason`. Only five actions exist:
-
-| Action | Required payload |
-| --- | --- |
-| `propose_option` | Active/supplied option ID and nonblank evidence that is a literal substring of this reply. |
-| `clarify` | One exact neutral question from `CLARIFICATION_QUESTIONS` in the contract module. |
-| `explain` | One to three unique IDs from the actual retrieved snippet set. Render source text. |
-| `offer_pause` | Support code `user_requested_pause`, `user_declined`, or `user_distress`. |
-| `out_of_scope` | Support code `outside_questionnaire`. |
-
-Non-applicable fields must be null (or `[]` for IDs). Support codes carry no
-generated reasoning or advice. Clarifications use a small, explicit set of generic
-neutral templates so deterministic validation can rule out hidden proposals,
-confirmations and save claims. Arbitrary model-written follow-ups are rejected.
-Question-specific templates can be added with catalog review later.
-
-The versioned prompt treats replies and retrieved text as data, separates attitude
-from capacity, rejects demographic inference and rule bypasses, and distinguishes
-uncertainty from refusal. It receives only the active question, complete options,
-available help/playback, retrieved snippets and current reply; no history or profile
-is sent. Literal evidence validation proves the quote exists, **not** that the
-financial interpretation is correct. Model quality and ambiguity handling require
-separate evaluation against a reviewed catalog.
-
-`parse_decision(raw, *, context: InterpretationInput)` is shared by the interpreter
-and probe. JSON mode never bypasses Pydantic or semantic validation. Duplicate JSON
-keys, unknown/forbidden actions, extra fields, fabricated evidence and foreign IDs
-fail validation. The HTTP adapter rejects tool calls, refusals, missing content and
-truncated completions; it never forwards hidden reasoning.
-
-### Failures and backend ownership
-
-The adapter uses temperature 0, a 512-token output cap, no streaming, a 64 KiB HTTP
-response limit, and both HTTP operation and total-attempt timeouts. Redirects,
-environment proxies and automatic transport retries are disabled. Malformed or
-semantically invalid output may retry **once** with a generic instruction, without
-echoing the failed response. Transport failure does not retry. With default config,
-two model attempts take at most approximately 60 seconds plus local validation.
-Backend request timeout configuration must allow for this or cancel inference.
-Cancellation propagates; it is not converted into a new answer.
-
-Fallback codes are `model_not_configured`, `model_unavailable`, `model_timeout` and
-`invalid_model_output`. Each has `decision=None`; success has no fallback reason.
-No fallback chooses an option. The backend must:
-
-1. Check session state/revision before inference and again before using its result.
-2. Decide whether a valid decision can create an **unconfirmed** proposal, ask the
-   allowed clarification, show retrieved text, or offer pause/out-of-scope UI.
-3. Translate fallback into fixed-option buttons; use catalog playback for proposals.
-4. Own confirmation, advancement, review, persistence, and catalog release gates.
-
-The inference code does not mutate the caller's session or inputs and knows
-nothing about whether a profile can be saved. It logs no financial conversation,
-credentials or reasoning. Avoid enabling HTTP debug logging with sensitive data;
-runtime/server logging and retention settings remain outside this module.
-
-For deterministic tests, `MockModelClient([json_string, ModelCallError(...)])`
-implements the same async `ModelClient.complete(messages)` protocol. Its ID is
-`mock-synthetic`; it records only a call count. Do not present mock outcomes as live
-inference. `LocalModelClient.list_models()` supports probe discovery, and
-`aclose()`/the async context manager owns HTTP resource cleanup.
-
-## Finance handoff still required
-
-There is no approved catalog in the inspected branches. The test-only Q4 fixtures
-are labelled `SYNTHETIC / PROVISIONAL` and use a non-release catalog version.
-Their status flags simulate approval gate inputs solely to test filters; they make
-no claim of finance approval. They are never loaded by runtime code. Probe data is
-also visibly synthetic, has namespaced option IDs, and retrieves no explanations.
-
-Finance/catalog owners still need to provide the released version, exact question
-and option semantics, approved playback/help, reviewed explanation provenance and
-approval/retrievable metadata. Q4 boundary/qualifier expectations and other financial
-policy decisions remain theirs. This module does not invent thresholds or decide
-whether a catalog release is approved.
-
-Implementation references: [Pydantic strict configuration](https://pydantic.dev/docs/validation/latest/api/pydantic/config/),
-[HTTPX timeouts](https://www.python-httpx.org/advanced/timeouts/), and
-[HTTPX test transports](https://www.python-httpx.org/advanced/transports/).
+See [MODEL_RAG.md](MODEL_RAG.md) for the existing isolated inference module.
+The conversation backend currently uses `OmlxAdapter`; this merge does not wire
+the separate retrieval/interpreter service into the conversation flow.

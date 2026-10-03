@@ -1,1 +1,1 @@
-"""Backend components; no application routes or session state."""
+"""Application, contracts and conversation orchestration."""

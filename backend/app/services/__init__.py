@@ -1,1 +1,1 @@
-"""Stateless model and retrieval services."""
+"""Conversation, deterministic rules and Finance scoring boundary."""

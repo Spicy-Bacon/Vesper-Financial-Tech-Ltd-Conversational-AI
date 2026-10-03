@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from app.schemas.inference import ExplanationRecord, RetrievalResult, RetrievalSnippet
 from app.services.retrieval import QuestionScopedRetriever
-from conftest import SYNTHETIC_VERSION
+from .conftest import SYNTHETIC_VERSION
 
 
 def retrieve(records, reply="no matching vocabulary"):
