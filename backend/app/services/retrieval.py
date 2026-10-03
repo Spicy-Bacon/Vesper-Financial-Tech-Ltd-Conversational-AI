@@ -1,10 +1,12 @@
 """Deterministic retrieval over a caller-supplied, versioned explanation set."""
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
+from pathlib import Path
 
 from pydantic import TypeAdapter
 
+from ..schemas import Catalog, Question, RetrievedContext
 from ..schemas.inference import (
     ExplanationRecord, Identifier, RetrievalResult, RetrievalSnippet, UserReply,
 )
@@ -65,7 +67,7 @@ class CatalogRetriever:
     API and ranking are unchanged; only its validated snippets cross the bridge.
     """
 
-    def __init__(self, release_directory):
+    def __init__(self, release_directory: str | Path):
         from ..catalog.release import load_release
 
         release, explanations = load_release(release_directory)
@@ -74,9 +76,7 @@ class CatalogRetriever:
             record for record in explanations.records if record.question_id != "Q7"
         )
 
-    def retrieve(self, *, text, question, catalog):
-        from ..schemas import Catalog, Question, RetrievedContext
-
+    def retrieve(self, *, text: str, question: Question, catalog: Catalog) -> Sequence[RetrievedContext]:
         # Revalidate dumps: Pydantic's mutable backend models can be changed by
         # callers after construction. Equality also rejects same-version drift.
         if not isinstance(catalog, Catalog) or not isinstance(question, Question):

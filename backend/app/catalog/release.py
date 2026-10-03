@@ -1,6 +1,5 @@
 """Validated file envelopes around the existing backend Catalog, not a new catalog API.
 
-These are interface scaffolding. No real workbook release has been imported yet.
 Only trusted import/configuration code may set approval and its recorded basis.
 """
 
@@ -93,6 +92,8 @@ class ExplanationsRelease(StrictContract):
         if len(ids) != len(set(ids)):
             raise ValueError("duplicate explanation content IDs")
         for record in self.records:
+            if record.text != record.text.strip():
+                raise ValueError("explanation text would be stripped by backend context validation")
             if record.catalog_version != self.catalog_version:
                 raise ValueError("explanation catalog version mismatch")
             if record.source_sheet != "Explanations" or record.source_row < 2:

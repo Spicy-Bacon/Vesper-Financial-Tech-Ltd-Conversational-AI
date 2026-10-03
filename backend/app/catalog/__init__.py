@@ -1,4 +1,4 @@
-"""Finance release readers. Workbook mapping awaits the exact Judge_Ready source."""
+"""Finance release readers for the allowlisted Judge_Ready workbook content."""
 
 from .provider import JsonCatalogProvider
 

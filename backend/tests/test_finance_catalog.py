@@ -193,7 +193,7 @@ def test_duplicate_json_keys_and_wrong_directory_rejected(release_dir):
         JsonCatalogProvider(moved)
 
 
-def test_import_scaffold_does_not_substitute_or_publish(tmp_path, capsys):
+def test_import_rejects_missing_wrong_or_malformed_source(tmp_path, capsys):
     missing = tmp_path / WORKBOOK_NAME
     assert import_main([str(missing)]) == 2
     assert "unavailable" in capsys.readouterr().err
@@ -205,7 +205,7 @@ def test_import_scaffold_does_not_substitute_or_publish(tmp_path, capsys):
     missing.write_bytes(b"SYNTHETIC bytes used only to test source hashing")
     assert source_provenance(missing).workbook_sha256 == hashlib.sha256(missing.read_bytes()).hexdigest()
     assert import_main([str(missing)]) == 2
-    assert "No files written" in capsys.readouterr().err
+    assert "Import blocked" in capsys.readouterr().err
     assert sorted(p.name for p in tmp_path.iterdir()) == sorted([WORKBOOK_NAME, older.name])
 
 
@@ -283,10 +283,6 @@ def test_unapproved_provider_keeps_existing_gate(documents, tmp_path, repository
     with TestClient(create_app(repository=repository, catalog=provider,
                               model=mocked_adapter(lambda request: complete()))) as client:
         assert client.get("/api/catalog").status_code == 503
-
-
-def test_real_judge_ready_import_is_blocked_until_source_is_inspected():
-    pytest.skip("BLOCKED: exact Judge_Ready workbook unavailable; header mapping and real import not implemented")
 
 
 @pytest.mark.parametrize("reply,kind,option", [

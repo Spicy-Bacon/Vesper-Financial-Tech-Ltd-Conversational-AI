@@ -1,0 +1,230 @@
+{
+  "approval": {
+    "approved": true,
+    "basis": "User explicitly confirmed Finance approval of the Judge_Ready question and option catalog for runtime use on 2026-10-03. Reviewer name and separate sign-off record not supplied."
+  },
+  "catalog": {
+    "demo": false,
+    "financeApproved": true,
+    "questions": [
+      {
+        "clarification": "This is about how you would feel, not what you could afford. The amounts are an example only. Your answer is recorded as a range, not an exact amount. If the fall would be exactly £500, choose 'Small loss'. If exactly £2,000, choose 'Moderate loss'.\nNo loss: I would not be comfortable with any fall\nSmall loss: a fall of up to £500\nModerate loss: a fall of more than £500, up to £2,000\nSignificant loss: a fall of more than £2,000\nUnsure",
+        "id": "Q1",
+        "label": "Attitude to Risk",
+        "options": [
+          {
+            "answer": "You would not be comfortable with any fall in the value of a £10,000 investment.",
+            "id": "Q1_A"
+          },
+          {
+            "answer": "On a £10,000 investment, the largest fall you would be comfortable with is in the range 'more than £0, up to £500'.",
+            "id": "Q1_B"
+          },
+          {
+            "answer": "On a £10,000 investment, the largest fall you would be comfortable with is in the range 'more than £500, up to £2,000'.",
+            "id": "Q1_C"
+          },
+          {
+            "answer": "On a £10,000 investment, the largest fall you would be comfortable with is in the range 'more than £2,000'.",
+            "id": "Q1_D"
+          },
+          {
+            "answer": "You are unsure how large a fall you would be comfortable with.",
+            "id": "Q1_U"
+          }
+        ],
+        "prompt": "Imagine you invested £10,000. What is the largest fall in its value you would be comfortable with?",
+        "requiresExplicitConfirmation": false
+      },
+      {
+        "clarification": "There is no right answer. Choose what you think you would really do, not what you think you should do.\nSell all of it\nSell some of it\nKeep it invested\nInvest more\nUnsure",
+        "id": "Q2",
+        "label": "Attitude to Risk",
+        "options": [
+          {
+            "answer": "If a £10,000 investment fell to £8,000, you would most likely sell all of it.",
+            "id": "Q2_A"
+          },
+          {
+            "answer": "If a £10,000 investment fell to £8,000, you would most likely sell some of it.",
+            "id": "Q2_B"
+          },
+          {
+            "answer": "If a £10,000 investment fell to £8,000, you would most likely keep it invested.",
+            "id": "Q2_C"
+          },
+          {
+            "answer": "If a £10,000 investment fell to £8,000, you would most likely invest more.",
+            "id": "Q2_D"
+          },
+          {
+            "answer": "You are unsure what you would do if a £10,000 investment fell to £8,000.",
+            "id": "Q2_U"
+          }
+        ],
+        "prompt": "If a £10,000 investment fell to £8,000, what would you most likely do?",
+        "requiresExplicitConfirmation": false
+      },
+      {
+        "clarification": "'This money' means the money you are thinking about investing. 'Essentials' means things like rent or mortgage, bills, food and travel to work.\nStruggle with essentials: I would struggle to pay for essentials\nChange spending: I could pay for essentials but would have to cut back on other spending\nManageable: I would not need to change my spending, but it would set back my plans\nLittle impact: it would make little or no difference to me\nUnsure",
+        "id": "Q3",
+        "label": "Capacity for Loss",
+        "options": [
+          {
+            "answer": "If this money fell by a quarter for a few years, you would struggle to pay for essentials.",
+            "id": "Q3_A"
+          },
+          {
+            "answer": "If this money fell by a quarter for a few years, you could pay for essentials but would have to cut back on other spending.",
+            "id": "Q3_B"
+          },
+          {
+            "answer": "If this money fell by a quarter for a few years, you would not need to change your spending, but it would set back your plans.",
+            "id": "Q3_C"
+          },
+          {
+            "answer": "If this money fell by a quarter for a few years, it would make little or no difference to you.",
+            "id": "Q3_D"
+          },
+          {
+            "answer": "You are unsure how a fall of a quarter would affect your normal finances.",
+            "id": "Q3_U"
+          }
+        ],
+        "prompt": "If this money fell in value by a quarter (for example, £10,000 falling to £7,500) and stayed lower for a few years, how would it affect your normal finances?",
+        "requiresExplicitConfirmation": true
+      },
+      {
+        "clarification": "Count only savings that are separate from this money and that you could withdraw within a few days. Do not count pensions or property. If it would be exactly 1 month or exactly 3 months, choose '1 to 3 months'.\nNo other savings\nSome, but less than 1 month\n1 to 3 months\nMore than 3 months\nUnsure",
+        "id": "Q4",
+        "label": "Capacity for Loss",
+        "options": [
+          {
+            "answer": "Apart from this money, you have no savings that you can get at quickly.",
+            "id": "Q4_A"
+          },
+          {
+            "answer": "Apart from this money, you have savings you can get at quickly that would cover less than 1 month of essential living costs.",
+            "id": "Q4_B"
+          },
+          {
+            "answer": "Apart from this money, you have savings you can get at quickly that would cover between 1 and 3 months of essential living costs.",
+            "id": "Q4_C"
+          },
+          {
+            "answer": "Apart from this money, you have savings you can get at quickly that would cover more than 3 months of essential living costs.",
+            "id": "Q4_D"
+          },
+          {
+            "answer": "You are unsure how long your other quickly accessible savings would cover essential living costs.",
+            "id": "Q4_U"
+          }
+        ],
+        "prompt": "Apart from this money, how many months of essential living costs could you cover from savings you can get at quickly?",
+        "requiresExplicitConfirmation": true
+      },
+      {
+        "clarification": "This is about what you owe now and how easy the repayments are, not about what would happen if you lost money. It includes store cards, car finance and money owed to family or friends. You do not need to give any amounts. If you have more than one debt, read the options from the top and choose the first one that fits.\nYes, and I sometimes struggle to keep up with at least one repayment\nYes, I am repaying money over time and keep up with all repayments comfortably\nYes, but only credit that I clear in full every month\nNo\nUnsure",
+        "id": "Q5",
+        "label": "Capacity for Loss",
+        "options": [
+          {
+            "answer": "Apart from any mortgage or student loan, you owe money and sometimes struggle to keep up with at least one repayment.",
+            "id": "Q5_A"
+          },
+          {
+            "answer": "Apart from any mortgage or student loan, you owe money that you are repaying over time, and you keep up with all repayments comfortably.",
+            "id": "Q5_B"
+          },
+          {
+            "answer": "Apart from any mortgage or student loan, the only money you owe is credit that you clear in full every month.",
+            "id": "Q5_C"
+          },
+          {
+            "answer": "Apart from any mortgage or student loan, you do not owe money.",
+            "id": "Q5_D"
+          },
+          {
+            "answer": "You are unsure whether you currently owe money on credit cards, loans or similar.",
+            "id": "Q5_U"
+          }
+        ],
+        "prompt": "Apart from a mortgage or student loan, do you currently owe money on things like credit cards, an overdraft, loans or buy-now-pay-later?",
+        "requiresExplicitConfirmation": true
+      },
+      {
+        "clarification": "Think about the first time you might need to take some of it out. If it would be exactly 6 months, choose '6 months to under 1 year'. If exactly 1, 3, 5 or 10 years, choose the option that starts with that number.\nLess than 6 months\n6 months to under 1 year\n1 year to under 3 years\n3 years to under 5 years\n5 years to under 10 years\n10 years or more\nUnsure",
+        "id": "Q6",
+        "label": "Time Horizon",
+        "options": [
+          {
+            "answer": "You expect it to be less than 6 months before you might first need any of this money.",
+            "id": "Q6_A"
+          },
+          {
+            "answer": "You expect it to be at least 6 months but less than 1 year before you might first need any of this money.",
+            "id": "Q6_B"
+          },
+          {
+            "answer": "You expect it to be at least 1 year but less than 3 years before you might first need any of this money.",
+            "id": "Q6_C"
+          },
+          {
+            "answer": "You expect it to be at least 3 years but less than 5 years before you might first need any of this money.",
+            "id": "Q6_D"
+          },
+          {
+            "answer": "You expect it to be at least 5 years but less than 10 years before you might first need any of this money.",
+            "id": "Q6_E"
+          },
+          {
+            "answer": "You expect it to be 10 years or more before you might first need any of this money.",
+            "id": "Q6_F"
+          },
+          {
+            "answer": "You are unsure how long it will be before you might first need any of this money.",
+            "id": "Q6_U"
+          }
+        ],
+        "prompt": "How long do you expect to keep this money invested before you may need it?",
+        "requiresExplicitConfirmation": false
+      }
+    ],
+    "version": "catalog-v2"
+  },
+  "provenance": {
+    "workbook_filename": "CC_Question_Set_Scored_v2_Judge_Ready.xlsx",
+    "workbook_sha256": "212d7a0a7649f6add4706d683539822f3d518e625164ce6e8379eef06c4fdf57"
+  },
+  "question_help": {
+    "Q1": "This is about how you would feel, not what you could afford. The amounts are an example only. Your answer is recorded as a range, not an exact amount. If the fall would be exactly £500, choose 'Small loss'. If exactly £2,000, choose 'Moderate loss'.",
+    "Q2": "There is no right answer. Choose what you think you would really do, not what you think you should do.",
+    "Q3": "'This money' means the money you are thinking about investing. 'Essentials' means things like rent or mortgage, bills, food and travel to work.",
+    "Q4": "Count only savings that are separate from this money and that you could withdraw within a few days. Do not count pensions or property. If it would be exactly 1 month or exactly 3 months, choose '1 to 3 months'.",
+    "Q5": "This is about what you owe now and how easy the repayments are, not about what would happen if you lost money. It includes store cards, car finance and money owed to family or friends. You do not need to give any amounts. If you have more than one debt, read the options from the top and choose the first one that fits.",
+    "Q6": "Think about the first time you might need to take some of it out. If it would be exactly 6 months, choose '6 months to under 1 year'. If exactly 1, 3, 5 or 10 years, choose the option that starts with that number.",
+    "Q7": "You can change any answer before your profile is saved. If anything is unclear, choose 'Unsure' and it will be explained again."
+  },
+  "review": {
+    "clarification": "You can change any answer before your profile is saved. If anything is unclear, choose 'Unsure' and it will be explained again.\nYes - Confirm\nNo - Correct\nUnsure",
+    "id": "Q7",
+    "label": "Confirmation",
+    "options": [
+      {
+        "answer": "You have confirmed that this review is correct. Your profile, including the scores shown, will now be saved.",
+        "id": "Q7_A"
+      },
+      {
+        "answer": "You have said something is not right. Your profile has not been saved. You will be asked which answer to change.",
+        "id": "Q7_B"
+      },
+      {
+        "answer": "You are unsure whether these answers are right. Your profile has not been saved. The answers will be explained again.",
+        "id": "Q7_U"
+      }
+    ],
+    "prompt": "Here is what will be recorded in your profile. Your profile has not been saved yet. [Show the confirmation_text for each confirmed answer, each with an Edit control. Then show the score line for each dimension and the overall score line from Scoring_Rules, including any that are not scored.] Does this accurately reflect your answers?",
+    "requiresExplicitConfirmation": false
+  },
+  "schema_version": "finance-catalog-release-v1"
+}
