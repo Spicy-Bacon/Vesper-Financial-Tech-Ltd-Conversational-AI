@@ -1,6 +1,6 @@
 # Proposed conversation API (v1)
 
-No backend existed in the inspected repository. Agree this contract with the backend owner before connecting. POST one JSON request to `/api/conversation`, returning a complete JSON snapshot. No streaming.
+The backend in `backend/` implements this snapshot contract. See [backend setup](backend/README.md) and [proposed integration contracts](backend/INTEGRATIONS.md). POST one JSON request to `/api/conversation`, returning a complete JSON snapshot. No streaming.
 
 ## Requests
 

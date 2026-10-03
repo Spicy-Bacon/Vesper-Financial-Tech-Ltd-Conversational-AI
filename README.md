@@ -28,6 +28,8 @@ State exists only in memory. Refreshing loses the session. Conversation content 
 
 ## Connect the backend
 
+The Python backend and an opt-in fictional catalog demo are available in [backend/README.md](backend/README.md). Its local preview serves this frontend and the API together on port 8765. The real catalog, retrieval and model adapters remain Harry/CS3's integration work; Finance supplies scoring policy. See [the proposed handoff](backend/INTEGRATIONS.md).
+
 Edit `src/config.js`: set `mode: 'http'` and the endpoint (default `/api/conversation`). Serve the frontend and API on the same origin or provide an appropriate development reverse proxy. The supplied development server does not proxy requests. There is no automatic fallback from the real service to synthetic answers.
 
 All communication goes through `src/service.js`. See [API.md](API.md) for the proposed JSON contract, action IDs, idempotency requirements and save rules. Keep Ollama calls, model configuration and credentials on the server. This is public browser configuration; no secrets belong here. No streaming is implemented because no streaming contract exists.
