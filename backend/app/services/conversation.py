@@ -15,7 +15,7 @@ from ..schemas import (
 from .rules import approved_catalog, canonical_proposal, confirm_proposal, next_question, question_for
 from .scoring import ScoringService
 from ..schemas.v1 import (
-    ConfirmationCommand, FinalizeCommand, MessageCommand, SessionCommand, SessionSnapshot,
+    ConfirmationCommand, CorrectionCommand, FinalizeCommand, MessageCommand, SessionCommand, SessionSnapshot,
     frontend_catalog, snapshot_for,
 )
 
@@ -122,7 +122,7 @@ class ConversationService:
         self, action: str, command: SessionCommand, session_id: str | None = None,
     ) -> SessionSnapshot:
         """Translate commands, then use _send/_advance in the same SQLite transaction."""
-        if action not in {"start", "message", "confirm", "finalize"}:
+        if action not in {"start", "message", "confirm", "finalize", "change"}:
             raise ConversationError(422, "This versioned action is not implemented.")
         with self.repository.transaction() as db:
             if action == "start":
@@ -158,6 +158,11 @@ class ConversationService:
                     questionId=state["proposal"]["questionId"], optionId=state["proposal"]["optionId"],
                     explicitConfirmation=command.explicit_confirmation,
                 )
+            elif action == "change":
+                assert isinstance(command, CorrectionCommand)
+                if not state["proposal"] or command.question_id != state["proposal"]["questionId"]:
+                    raise ConversationError(422, "Only the current proposed answer can be changed.")
+                extra["questionId"] = command.question_id
             elif action == "finalize":
                 assert isinstance(command, FinalizeCommand)
                 if state["type"] != "final_playback" or command.review_version != state["reviewVersion"]:
@@ -247,8 +252,12 @@ class ConversationService:
         elif request.action == "change":
             current = question_for(catalog, request.questionId)
             state["currentQuestion"] = current.id
+            was_confirmed = any(a.questionId == current.id for a in answers)
             answers = [a for a in answers if a.questionId != current.id]
-            text = "The previous confirmation has been removed. Review and accept the final answers again. " + current.prompt
+            text = (
+                "The previous confirmation has been removed. Review and accept the final answers again. "
+                if was_confirmed else "The proposed answer has been discarded. Please answer again. "
+            ) + current.prompt
         elif request.action == "not_sure":
             response_type = "clarification"
             text = current.clarification

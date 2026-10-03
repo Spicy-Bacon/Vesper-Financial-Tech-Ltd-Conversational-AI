@@ -29,6 +29,10 @@ class FinalizeCommand(SessionCommand):
     review_version: Text
 
 
+class CorrectionCommand(SessionCommand):
+    question_id: Identifier
+
+
 class OptionSnapshot(Schema):
     option_id: Identifier
     label: Text
@@ -165,7 +169,7 @@ def snapshot_for(session_id: str, state: dict) -> SessionSnapshot:
             option_id=value["optionId"], playback=value["answer"], is_unsure=option.is_unsure,
             origin=state["proposalOrigin"], safety=value["safety"],
         )
-        stage, actions = "AWAITING_CONFIRMATION", ["confirm"]
+        stage, actions = "AWAITING_CONFIRMATION", ["confirm", "change"]
     elif state["type"] in {"pause", "support"}:
         stage, actions = "PAUSED", []
         active = None

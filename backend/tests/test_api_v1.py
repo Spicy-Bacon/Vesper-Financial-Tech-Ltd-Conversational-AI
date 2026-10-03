@@ -124,7 +124,7 @@ def test_first_question_snapshot_proposal_confirmation_and_get(v1, v1_app, repos
     assert initial["active_question"]["options"][1]["is_unsure"] is True
     proposed = v1.propose()
     assert proposed["state"] == "AWAITING_CONFIRMATION"
-    assert proposed["allowed_actions"] == ["confirm"] and proposed["confirmed_answers"] == []
+    assert proposed["allowed_actions"] == ["confirm", "change"] and proposed["confirmed_answers"] == []
     assert proposed["pending_proposal"]["origin"] == "model"
     assert proposed["pending_proposal"]["playback"] == initial["active_question"]["options"][0]["playback"]
     assert v1.load().json() == proposed
@@ -424,7 +424,7 @@ def test_only_four_routes_and_protocols_cannot_mutate_each_others_sessions(v1, v
     paths = {path for path in v1_app.openapi()["paths"] if path.startswith("/api/v1")}
     assert paths == {"/api/v1/sessions", "/api/v1/sessions/{session_id}",
                      "/api/v1/sessions/{session_id}/messages", "/api/v1/sessions/{session_id}/confirmations",
-                     "/api/v1/sessions/{session_id}/finalize"}
+                     "/api/v1/sessions/{session_id}/finalize", "/api/v1/sessions/{session_id}/corrections"}
     initial = v1.send("start")
     body = {"sessionId": initial["session_id"], "requestId": "legacy-command", "revision": 1,
             "action": "message", "message": {"text": "a"}}

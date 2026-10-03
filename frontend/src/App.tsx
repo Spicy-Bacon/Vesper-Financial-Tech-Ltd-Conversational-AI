@@ -281,6 +281,11 @@ export default function App({ adapter }: { adapter: Adapter }) {
                 </span>
               </div>
               <div className="toolbar">
+                {snapshot && !error && !sessionUnavailable && (
+                  <button disabled={busy} onClick={() => void refresh()}>
+                    Refresh session state
+                  </button>
+                )}
                 {canPause && (
                   <button
                     onClick={() => interrupt("pause")}
