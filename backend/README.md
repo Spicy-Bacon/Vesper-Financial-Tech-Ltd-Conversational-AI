@@ -50,9 +50,16 @@ selects HTTP mode; it is ignored by Git.
 `/health` checks process liveness. `/ready` reports dependency wiring and the actual
 demo flag; it does not prove model reachability or successful inference. Verify an
 actual answer proposal, confirmation and six-answer finalize before presenting a
-live demo. Local verification found the installed oMLX server aborting at startup
-with an MLX/nanobind duplicate `cpu` registration error; that must be resolved for
-live inference.
+live demo. The React frontend defaults to HTTP mode; scripted fixtures require
+an explicit `VITE_API_MODE=demo`. A saved profile export downloads the validated
+receipt returned by finalize, including its accepted answers, without requiring
+an additional profile lookup endpoint. Audit export remains unavailable on this
+minimal backend.
+
+The classifier accepts natural-language paraphrases and clear qualitative
+extremes. It proposes an authored option for review; it still requires a separate
+confirmation before recording it. An ambiguous statement such as wealth alone
+must be clarified rather than treated as willingness to accept losses.
 
 The importer preserves `option_label` as `label`, the explicit Excel Boolean
 `is_uncertain` as `is_unsure`, and `confirmation_text` unchanged. Approval is

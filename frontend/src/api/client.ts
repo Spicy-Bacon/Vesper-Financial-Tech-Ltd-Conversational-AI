@@ -193,7 +193,7 @@ export function createHttpAdapter(timeoutMs = 35000): Adapter {
   };
 }
 export function createAdapter(
-  mode = import.meta.env.VITE_API_MODE ?? "demo",
+  mode = import.meta.env.VITE_API_MODE ?? "http",
 ): Adapter {
   if (mode === "demo") return createDemo();
   if (mode === "http") return createHttpAdapter();

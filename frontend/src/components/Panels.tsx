@@ -107,13 +107,7 @@ function download(value: unknown, filename: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-export function AcceptedProfile({
-  snapshot,
-  adapter,
-}: {
-  snapshot: Snapshot;
-  adapter: Adapter;
-}) {
+export function AcceptedProfile({ snapshot }: { snapshot: Snapshot }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const receipt = snapshot.receipt!;
@@ -122,16 +116,8 @@ export function AcceptedProfile({
     setBusy(true);
     setError("");
     try {
-      const profile = await adapter.profile(
-        receipt.profile_id,
-        snapshot.session_id,
-      );
-      if (JSON.stringify(profile) !== JSON.stringify(receipt))
-        throw Error(
-          "The returned profile does not match the acceptance receipt.",
-        );
       download(
-        profile,
+        receipt,
         `${receipt.simulated ? "simulated-" : "accepted-"}profile.json`,
       );
     } catch (e) {

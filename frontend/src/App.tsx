@@ -558,7 +558,7 @@ export default function App({ adapter }: { adapter: Adapter }) {
                     </section>
                   )}
                   {snapshot.state === "SAVED" && snapshot.receipt && (
-                    <AcceptedProfile snapshot={snapshot} adapter={adapter} />
+                    <AcceptedProfile snapshot={snapshot} />
                   )}
                 </>
               )}
