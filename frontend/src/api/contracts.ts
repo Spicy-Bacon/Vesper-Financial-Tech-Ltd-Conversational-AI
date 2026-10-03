@@ -47,6 +47,25 @@ export const profileSchema = z.object({
   accepted_at: text,
   simulated: z.boolean(),
   answers: z.array(answerSchema).length(6),
+  score: z
+    .object({
+      status: z.enum(["not_configured", "scored"]),
+      policyVersion: text.nullable(),
+      catalogVersion: text,
+      values: z.record(
+        text,
+        z.union([z.number().finite(), z.string().regex(/^\d+(\.\d+)?$/)]),
+      ),
+      classification: z
+        .enum(["Low", "Medium", "High", "Not assigned"])
+        .nullable(),
+      limitingDimensions: z.array(z.enum(["attitude", "capacity", "horizon"])),
+      unresolvedDimensions: z.array(
+        z.enum(["attitude", "capacity", "horizon"]),
+      ),
+    })
+    .nullable()
+    .optional(),
 });
 export const snapshotSchema = z
   .object({

@@ -144,6 +144,25 @@ export function AcceptedProfile({ snapshot }: { snapshot: Snapshot }) {
         {receipt.catalog_version}
       </p>
       <AnswerList answers={receipt.answers} />
+      {receipt.score?.status === "scored" && (
+        <div>
+          <h3>Risk profile: {receipt.score.classification}</h3>
+          {(["attitude", "capacity", "horizon", "overall"] as const).map(
+            (dimension) => (
+              <p key={dimension}>
+                {dimension}:{" "}
+                {receipt.score!.values[dimension] === undefined
+                  ? "Not scored"
+                  : `${receipt.score!.values[dimension]} / 100`}
+              </p>
+            ),
+          )}
+          <p className="subtle">
+            Prototype risk profile based on your confirmed questionnaire
+            answers. This is not investment advice.
+          </p>
+        </div>
+      )}
       <button disabled={busy} onClick={exportProfile}>
         {busy
           ? "Preparing export…"

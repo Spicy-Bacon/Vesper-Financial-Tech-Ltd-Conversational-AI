@@ -20,6 +20,7 @@ from .interfaces import CatalogProvider, FinancePolicy, ModelAdapter, Retriever
 from .repositories.profiles import ProfileRepository
 from .services.conversation import ConversationService
 from .services.scoring import ScoringService
+from .services.finance_policy import WorkbookFinancePolicy
 from .services.retrieval import CatalogRetriever
 from .schemas.v1 import frontend_catalog
 from .settings import Settings
@@ -88,6 +89,7 @@ def create_configured_app(settings: Settings | None = None) -> FastAPI:
     model = None
     catalog = None
     retrieval = None
+    finance_policy = None
     if settings.VESPER_DEMO and settings.VESPER_MODEL_BACKEND == "omlx":
         raise ValueError("Choose the scripted demo or oMLX, not both.")
     if settings.VESPER_MODEL_BACKEND == "omlx":
@@ -106,10 +108,11 @@ def create_configured_app(settings: Settings | None = None) -> FastAPI:
                     raise ValueError("the runtime catalog must have recorded Finance approval and be non-demo")
                 frontend_catalog(value)
                 retrieval = CatalogRetriever(release_directory)
+                finance_policy = WorkbookFinancePolicy(value)
             except (OSError, ValueError, ConversationError) as exc:
                 raise ValueError(f"Cannot configure Finance release at {release_directory}: {exc}") from exc
     return create_app(
-        catalog=catalog, retrieval=retrieval, model=model,
+        catalog=catalog, retrieval=retrieval, model=model, finance_policy=finance_policy,
         demo=settings.VESPER_DEMO, demo_catalog=settings.VESPER_DEMO_CATALOG,
         serve_frontend=settings.VESPER_SERVE_FRONTEND,
     )

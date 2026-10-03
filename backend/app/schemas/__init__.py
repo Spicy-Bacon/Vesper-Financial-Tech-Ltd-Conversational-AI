@@ -143,12 +143,17 @@ class ScoreResult(Schema):
     catalogVersion: Identifier
     values: dict[Identifier, Decimal] = Field(default_factory=dict)
     classification: Text | None = None
+    limitingDimensions: list[Literal["attitude", "capacity", "horizon"]] = Field(default_factory=list)
+    unresolvedDimensions: list[Literal["attitude", "capacity", "horizon"]] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def valid_score(self):
         if self.status == "scored" and not self.policyVersion:
             raise ValueError("Scored results require a Finance policy version.")
-        if self.status == "not_configured" and (self.policyVersion or self.values or self.classification):
+        if self.status == "not_configured" and (
+            self.policyVersion or self.values or self.classification
+            or self.limitingDimensions or self.unresolvedDimensions
+        ):
             raise ValueError("Unconfigured scoring cannot report scores or classifications.")
         if any(not value.is_finite() for value in self.values.values()):
             raise ValueError("Scores must be finite.")

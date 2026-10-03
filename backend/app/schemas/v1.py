@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import Field
 
 from ..errors import IntegrationUnavailable
-from . import Answer, Catalog, Identifier, Profile, Schema, Text
+from . import Answer, Catalog, Identifier, Profile, Schema, ScoreResult, Text
 
 
 class SessionCommand(Schema):
@@ -81,6 +81,7 @@ class ProfileSnapshot(Schema):
     accepted_at: Text
     simulated: bool
     answers: list[AnswerSnapshot] = Field(min_length=6, max_length=6)
+    score: ScoreResult | None = None
 
 
 class SnippetSnapshot(Schema):
@@ -189,6 +190,7 @@ def snapshot_for(session_id: str, state: dict) -> SessionSnapshot:
             accepted_at=datetime.fromtimestamp(profile.createdAt, timezone.utc).isoformat(),
             simulated=False,
             answers=[answer(a.model_dump(mode="json")) for a in profile.answers],
+            score=profile.score,
         )
     else:
         stage = "ASKING"
