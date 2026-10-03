@@ -1,9 +1,70 @@
 # Conversation backend
 
-FastAPI orchestration implementing the existing `/api/conversation` snapshot contract.
-[API.md](../API.md) now describes the React frontend's TARGET `/api/v1` contract;
-CS2 will adapt the backend in later work. This baseline does not connect the two APIs.
-Harry/CS3 own the real catalog importer, retrieval and model adapter. Finance owns approved
+## Approved six-question application (Mac)
+
+The configured oMLX path now injects `JsonCatalogProvider` and `CatalogRetriever`
+from `data/catalog/catalog-v2` when both demo flags are false. The directory is
+resolved from the repository location, regardless of the terminal directory.
+Missing/invalid files, incomplete option metadata or missing Finance approval fail
+startup clearly. No demo fallback is used. Finance scoring remains optional.
+
+Keep `OMLX_API_KEY`, `OMLX_BASE_URL=http://127.0.0.1:8000/v1` and the exact
+`OMLX_MODEL=Qwen3.5-9B-4bit` in the ignored root `.env`. From the repository root,
+start oMLX in one terminal (uses the existing key without printing it):
+
+```bash
+backend/.venv/bin/python - <<'PY'
+import subprocess
+from pathlib import Path
+from backend.app.settings import Settings
+s = Settings.load()
+if not s.OMLX_API_KEY:
+    raise SystemExit("Configure OMLX_API_KEY in .env first.")
+raise SystemExit(subprocess.call([
+    "omlx", "serve", "--model-dir", str(Path.home() / ".omlx/models/mlx-community"),
+    "--host", "127.0.0.1", "--port", "8000", "--log-level", "warning",
+    "--api-key", s.OMLX_API_KEY.get_secret_value(),
+]))
+PY
+```
+
+Then check model discovery and start FastAPI in a second terminal:
+
+```bash
+backend/.venv/bin/python -m backend.scripts.check_omlx
+VESPER_MODEL_BACKEND=omlx VESPER_DEMO=0 VESPER_DEMO_CATALOG=0 VESPER_SERVE_FRONTEND=0 \
+  backend/.venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8001 --no-access-log
+```
+
+Start the React frontend in a third terminal:
+
+```bash
+VITE_API_MODE=http npm run dev
+```
+
+Open `http://127.0.0.1:5173`. Vite proxies `/api` to `http://127.0.0.1:8001`.
+Only FastAPI calls oMLX; the browser receives no model key or direct model URL.
+Restart Vite when changing its environment. The local `frontend/.env.local` also
+selects HTTP mode; it is ignored by Git.
+
+`/health` checks process liveness. `/ready` reports dependency wiring and the actual
+demo flag; it does not prove model reachability or successful inference. Verify an
+actual answer proposal, confirmation and six-answer finalize before presenting a
+live demo. Local verification found the installed oMLX server aborting at startup
+with an MLX/nanobind duplicate `cpu` registration error; that must be resolved for
+live inference.
+
+The importer preserves `option_label` as `label`, the explicit Excel Boolean
+`is_uncertain` as `is_unsure`, and `confirmation_text` unchanged. Approval is
+explicit and recorded; re-importing different output under an existing catalog
+version is refused. Do not overwrite a previously published release to change
+Finance wording or metadata.
+
+FastAPI exposes the React `/api/v1` session contract, including final acceptance
+and saved receipts, alongside the legacy `/api/conversation` contract.
+[API.md](../API.md) describes the broader frontend contract; only the session,
+message, confirmation and finalize routes are currently implemented.
+Finance owns approved
 question meanings, option meanings, safety requirements, points and formulas. The backend
 contains no financial scoring formula.
 

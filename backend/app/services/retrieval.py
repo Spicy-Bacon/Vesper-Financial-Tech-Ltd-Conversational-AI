@@ -1,11 +1,13 @@
 """Deterministic retrieval over a caller-supplied, versioned explanation set."""
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
+from pathlib import Path
 
 from pydantic import TypeAdapter
 
-from app.schemas.inference import (
+from ..schemas import Catalog, Question, RetrievedContext
+from ..schemas.inference import (
     ExplanationRecord, Identifier, RetrievalResult, RetrievalSnippet, UserReply,
 )
 
@@ -56,3 +58,38 @@ class QuestionScopedRetriever:
             ) for r in candidates[:3]],
             retrieval_method=method,
         )
+
+
+class CatalogRetriever:
+    """Thin backend Retriever bridge over a validated, pinned release.
+
+    Files are read once at initialization. The original QuestionScopedRetriever
+    API and ranking are unchanged; only its validated snippets cross the bridge.
+    """
+
+    def __init__(self, release_directory: str | Path):
+        from ..catalog.release import load_release
+
+        release, explanations = load_release(release_directory)
+        self._catalog = release.catalog.model_copy(deep=True)
+        self._retriever = QuestionScopedRetriever(
+            record for record in explanations.records if record.question_id != "Q7"
+        )
+
+    def retrieve(self, *, text: str, question: Question, catalog: Catalog) -> Sequence[RetrievedContext]:
+        # Revalidate dumps: Pydantic's mutable backend models can be changed by
+        # callers after construction. Equality also rejects same-version drift.
+        if not isinstance(catalog, Catalog) or not isinstance(question, Question):
+            raise ValueError("expected backend Catalog and Question")
+        supplied = Catalog.model_validate(catalog.model_dump(), strict=True)
+        active = Question.model_validate(question.model_dump(), strict=True)
+        if supplied != self._catalog:
+            raise ValueError("catalog does not match pinned release")
+        expected = next((q for q in self._catalog.questions if q.id == active.id), None)
+        if expected is None or active != expected or active.id == "Q7":
+            raise ValueError("question does not match pinned answer catalog")
+        result = self._retriever.retrieve(
+            catalog_version=self._catalog.version, question_id=active.id, user_reply=text,
+        )
+        return [RetrievedContext(sourceId=snippet.content_id, text=snippet.text)
+                for snippet in result.snippets]

@@ -13,12 +13,15 @@ from .api.frontend import mount_frontend
 from .api.health import router as health_router
 from .api.v1 import router as v1_router
 from .adapters.omlx import OmlxAdapter
+from .catalog.provider import JsonCatalogProvider
 from .demo import DemoCatalog, ScriptedDemoAdapter
 from .errors import ConversationError
 from .interfaces import CatalogProvider, FinancePolicy, ModelAdapter, Retriever
 from .repositories.profiles import ProfileRepository
 from .services.conversation import ConversationService
 from .services.scoring import ScoringService
+from .services.retrieval import CatalogRetriever
+from .schemas.v1 import frontend_catalog
 from .settings import Settings
 
 
@@ -83,6 +86,8 @@ def create_app(
 def create_configured_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.load()
     model = None
+    catalog = None
+    retrieval = None
     if settings.VESPER_DEMO and settings.VESPER_MODEL_BACKEND == "omlx":
         raise ValueError("Choose the scripted demo or oMLX, not both.")
     if settings.VESPER_MODEL_BACKEND == "omlx":
@@ -92,8 +97,20 @@ def create_configured_app(settings: Settings | None = None) -> FastAPI:
             base_url=settings.OMLX_BASE_URL, model=settings.OMLX_MODEL,
             api_key=settings.OMLX_API_KEY.get_secret_value(),
         )
+        if not settings.VESPER_DEMO and not settings.VESPER_DEMO_CATALOG:
+            release_directory = Path(__file__).resolve().parents[2] / "data" / "catalog" / "catalog-v2"
+            try:
+                catalog = JsonCatalogProvider(release_directory)
+                value = catalog.load()
+                if not value.financeApproved or value.demo:
+                    raise ValueError("the runtime catalog must have recorded Finance approval and be non-demo")
+                frontend_catalog(value)
+                retrieval = CatalogRetriever(release_directory)
+            except (OSError, ValueError, ConversationError) as exc:
+                raise ValueError(f"Cannot configure Finance release at {release_directory}: {exc}") from exc
     return create_app(
-        model=model, demo=settings.VESPER_DEMO, demo_catalog=settings.VESPER_DEMO_CATALOG,
+        catalog=catalog, retrieval=retrieval, model=model,
+        demo=settings.VESPER_DEMO, demo_catalog=settings.VESPER_DEMO_CATALOG,
         serve_frontend=settings.VESPER_SERVE_FRONTEND,
     )
 

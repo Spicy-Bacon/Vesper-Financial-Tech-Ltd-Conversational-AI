@@ -1,0 +1,180 @@
+{
+  "catalog_version": "catalog-v2",
+  "provenance": {
+    "workbook_filename": "CC_Question_Set_Scored_v2_Judge_Ready.xlsx",
+    "workbook_sha256": "212d7a0a7649f6add4706d683539822f3d518e625164ce6e8379eef06c4fdf57"
+  },
+  "records": [
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX01",
+      "question_id": "Q1",
+      "retrievable": true,
+      "source_row": 2,
+      "source_sheet": "Explanations",
+      "text": "A loss means your money being worth less than the amount you put in. The value of investments can go down as well as up, and nobody can know in advance which it will be."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX02",
+      "question_id": "Q1",
+      "retrievable": true,
+      "source_row": 3,
+      "source_sheet": "Explanations",
+      "text": "£10,000 is only an example to make the amounts easy to picture. It is not a suggestion about how much to invest, and your answer is not tied to that amount."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX03",
+      "question_id": "Q2",
+      "retrievable": true,
+      "source_row": 4,
+      "source_sheet": "Explanations",
+      "text": "This is a fall of one fifth. The question asks what you think you would actually do if you saw that happen, because people often react differently from how they expect to."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX04",
+      "question_id": "Q3",
+      "retrievable": true,
+      "source_row": 5,
+      "source_sheet": "Explanations",
+      "text": "This is about what would change in your day-to-day life if the money were worth less for a few years. It is about what you could afford, not how you would feel."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX05",
+      "question_id": "Q3",
+      "retrievable": true,
+      "source_row": 6,
+      "source_sheet": "Explanations",
+      "text": "Essentials are the costs you have to pay to keep going: rent or mortgage, energy and water, food, travel to work, and repayments you are committed to."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX06",
+      "question_id": "Q4",
+      "retrievable": true,
+      "source_row": 7,
+      "source_sheet": "Explanations",
+      "text": "Emergency savings are money set aside for unexpected costs, such as a broken boiler or a gap between jobs. The question asks how long those savings would cover your essential living costs if you had no income."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX07",
+      "question_id": "Q4",
+      "retrievable": true,
+      "source_row": 8,
+      "source_sheet": "Explanations",
+      "text": "This means money you could withdraw within a few days without a penalty, such as an easy-access savings account. It does not include pensions, property, or the money this conversation is about."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX08",
+      "question_id": "Q5",
+      "retrievable": true,
+      "source_row": 9,
+      "source_sheet": "Explanations",
+      "text": "This question is about money you owe now, other than a mortgage or student loan, and how easy it is to keep up with the repayments. It is not about what would happen if you lost money. You do not need to give any amounts. If you have more than one debt, answer for the one that is hardest to keep up with."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX09",
+      "question_id": "Q6",
+      "retrievable": true,
+      "source_row": 10,
+      "source_sheet": "Explanations",
+      "text": "Time horizon means how long the money is likely to stay invested before you need to take any of it out. Think about the first time you might need it, not the last."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX10",
+      "question_id": "Q7",
+      "retrievable": false,
+      "source_row": 11,
+      "source_sheet": "Explanations",
+      "text": "Your profile will contain only the answers shown on this screen, in the words shown. It is not saved until you press 'Yes - Confirm'. This step records your answers and does not tell you what to do with your money."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX11",
+      "question_id": "Q1",
+      "retrievable": true,
+      "source_row": 12,
+      "source_sheet": "Explanations",
+      "text": "Your answer to this question is recorded as a range, not an exact figure. If you say £300, the record shows the range 'more than £0, up to £500'. This does not mean you are comfortable losing £500. If the range does not say what you mean, you can change it."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX12",
+      "question_id": "Q7",
+      "retrievable": false,
+      "source_row": 13,
+      "source_sheet": "Explanations",
+      "text": "This number adds up your two answers about falls in value. Each answer has 1 to 4 points, so the total runs from 2 to 8. A higher number means you said you were more comfortable seeing the value fall. It describes your answers. It is not a rating of you, and it does not tell you what to do with your money."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX13",
+      "question_id": "Q7",
+      "retrievable": false,
+      "source_row": 14,
+      "source_sheet": "Explanations",
+      "text": "This number adds up your three answers about paying for essentials, your other savings and money you owe. Each answer has 1 to 4 points, so the total runs from 3 to 12. A higher number means you said a fall in value would affect your finances less. It describes your answers and does not tell you what to do with your money."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX14",
+      "question_id": "Q7",
+      "retrievable": false,
+      "source_row": 15,
+      "source_sheet": "Explanations",
+      "text": "This number comes from your answer about when you might first need any of the money. It runs from 1 to 6. A higher number means a longer time before you might need it. It describes your answer and does not tell you what to do with your money."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX15",
+      "question_id": "Q7",
+      "retrievable": false,
+      "source_row": 16,
+      "source_sheet": "Explanations",
+      "text": "If you answered 'Unsure' to a question, that part of your profile is shown as 'not scored'. That is fine. It is not counted as zero, and the other parts are still worked out. You can change an 'Unsure' answer before your profile is saved if you want to."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX16",
+      "question_id": "Q7",
+      "retrievable": false,
+      "source_row": 17,
+      "source_sheet": "Explanations",
+      "text": "Each of your three scores is also shown out of 100, so they can be compared. Your overall score is the lowest of those three. We use the lowest, not an average, because feeling comfortable with risk does not make up for a fall that would strain your finances, or for needing the money soon. The review tells you which area set your overall score. If any of the three is not scored, there is no overall score. It describes your answers and does not tell you what to do with your money."
+    },
+    {
+      "approval_status": "approved",
+      "catalog_version": "catalog-v2",
+      "content_id": "EX17",
+      "question_id": "Q7",
+      "retrievable": false,
+      "source_row": 18,
+      "source_sheet": "Explanations",
+      "text": "The category comes from your overall score. Low is 0 to 39: at least one area scored low. Medium is 40 to 69: all three areas scored in the middle or higher. High is 70 to 100: all three areas scored high. The category is a short description of your answers. It is not a rating of you, and it is not a recommendation about what to do with your money."
+    }
+  ],
+  "schema_version": "finance-explanations-release-v1"
+}
