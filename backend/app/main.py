@@ -11,6 +11,7 @@ from .api.catalog import router as catalog_router
 from .api.conversation import router as conversation_router
 from .api.frontend import mount_frontend
 from .api.health import router as health_router
+from .api.v1 import router as v1_router
 from .adapters.omlx import OmlxAdapter
 from .demo import DemoCatalog, ScriptedDemoAdapter
 from .errors import ConversationError
@@ -73,6 +74,7 @@ def create_app(
     app.include_router(health_router)
     app.include_router(catalog_router)
     app.include_router(conversation_router)
+    app.include_router(v1_router)
     if serve_frontend:
         mount_frontend(app)
     return app

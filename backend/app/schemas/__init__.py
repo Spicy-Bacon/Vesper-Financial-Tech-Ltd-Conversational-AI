@@ -88,6 +88,9 @@ class ConversationResponse(Schema):
 class Option(Schema):
     id: Identifier
     answer: Text
+    # Catalog-owner metadata; legacy providers need not supply it. V1 does.
+    label: Text | None = None
+    is_unsure: bool | None = Field(default=None, strict=True)
 
 
 class Question(Schema):

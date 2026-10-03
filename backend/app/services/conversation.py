@@ -14,6 +14,10 @@ from ..schemas import (
 )
 from .rules import approved_catalog, canonical_proposal, confirm_proposal, next_question, question_for
 from .scoring import ScoringService
+from ..schemas.v1 import (
+    ConfirmationCommand, MessageCommand, SessionCommand, SessionSnapshot,
+    frontend_catalog, snapshot_for,
+)
 
 
 class ConversationService:
@@ -35,59 +39,136 @@ class ConversationService:
         self.clock = clock
 
     def send(self, request: ConversationRequest) -> ConversationResponse:
+        with self.repository.transaction() as db:
+            return self._send(request, db)
+
+    def _send(self, request: ConversationRequest, db, *, cache_request: bool = True) -> ConversationResponse:
+        """Existing transition pipeline, with an externally owned transaction for V1."""
         fingerprint = hashlib.sha256(json.dumps(
             request.model_dump(mode="json"), sort_keys=True, separators=(",", ":"),
         ).encode()).hexdigest()
+        # Replays must win over revision checks, including after a later save/edit.
+        cached = self.repository.cached_request(db, request.sessionId, request.requestId) if cache_request else None
+        if cached:
+            if cached["fingerprint"] != fingerprint:
+                raise ConversationError(409, "Idempotency key was reused with a different request.")
+            return ConversationResponse.model_validate_json(cached["response"])
+        now = self.clock()
+        state = self.repository.load_session(db, request.sessionId)
+        if state is None:
+            if request.action != "start":
+                raise ConversationError(404, "Session not found. Start a new conversation.")
+            if request.revision != 0:
+                raise ConversationError(409, "A new session must start at revision zero.")
+            if self.catalog is None or self.model is None:
+                raise IntegrationUnavailable()
+            try:
+                catalog = approved_catalog(
+                    Catalog.model_validate(self.catalog.load()), allow_demo=self.allow_demo,
+                )
+            except ConversationError:
+                raise
+            except Exception as exc:
+                raise IntegrationUnavailable() from exc
+            state = {
+                "catalog": catalog.model_dump(mode="json"), "revision": 0,
+                "answers": [], "proposal": None, "type": "message", "actions": [],
+                "canMessage": True, "currentQuestion": catalog.questions[0].id,
+                "expiresAt": now + self.session_ttl, "profileVersion": 0,
+            }
+        else:
+            if cache_request and state.get("apiVersion") == 1:
+                raise ConversationError(422, "Use the versioned API for this session.")
+            if state["expiresAt"] <= now:
+                raise ConversationError(410, "Session expired. Start a new conversation.")
+            if request.revision != state["revision"]:
+                raise ConversationError(409, "Session revision has changed.")
+            if request.action == "start":
+                raise ConversationError(409, "Session already exists. Use a new session identifier.")
+        catalog = Catalog.model_validate(state["catalog"])
+        if not cache_request:
+            frontend_catalog(catalog)
+        answers = [Answer.model_validate(a) for a in state["answers"]]
+        response = self._advance(request, state, catalog, answers, db, now)
+        state.update(
+            revision=response.revision, answers=[a.model_dump(mode="json") for a in response.confirmedAnswers],
+            proposal=response.proposal.model_dump(mode="json") if response.proposal else None,
+            type=response.type, actions=[a.model_dump(mode="json") for a in response.actions],
+            canMessage=response.canMessage, assistantMessage=response.assistant.text,
+            proposalId=str(uuid4()) if response.proposal else None,
+            proposalOrigin="demo" if isinstance(self.model, ScriptedDemoAdapter) else "model",
+            reviewVersion=str(uuid4()) if response.type == "final_playback" else None,
+        )
+        self.repository.store_session(db, request.sessionId, state)
+        if cache_request:
+            self.repository.store_request(db, request.sessionId, request.requestId,
+                                          fingerprint, response.model_dump_json())
+        return response
+
+    def _v1_state(self, db, session_id: str) -> dict:
+        state = self.repository.load_session(db, session_id)
+        if state is None or state.get("apiVersion") != 1:
+            raise ConversationError(404, "Session not found. Start a new conversation.")
+        if state["expiresAt"] <= self.clock():
+            raise ConversationError(410, "Session expired. Start a new conversation.")
+        return state
+
+    def load_v1(self, session_id: str) -> SessionSnapshot:
         with self.repository.transaction() as db:
-            # Replays must win over revision checks, including after a later save/edit.
-            cached = self.repository.cached_request(db, request.sessionId, request.requestId)
+            return snapshot_for(session_id, self._v1_state(db, session_id))
+
+    def send_v1(
+        self, action: str, command: SessionCommand, session_id: str | None = None,
+    ) -> SessionSnapshot:
+        """Translate commands, then use _send/_advance in the same SQLite transaction."""
+        if action not in {"start", "message", "confirm"}:
+            raise ConversationError(422, "This versioned action is not implemented.")
+        with self.repository.transaction() as db:
+            if action == "start":
+                session_id = self.repository.creation_session(db, command.request_id) or str(uuid4())
+            elif session_id is None:
+                raise ConversationError(404, "Session not found. Start a new conversation.")
+            fingerprint = hashlib.sha256(json.dumps(
+                {"api": "v1", "action": action, "session_id": session_id,
+                 "command": command.model_dump(mode="json")},
+                sort_keys=True, separators=(",", ":"),
+            ).encode()).hexdigest()
+            cached = self.repository.cached_request(db, session_id, command.request_id)
             if cached:
                 if cached["fingerprint"] != fingerprint:
                     raise ConversationError(409, "Idempotency key was reused with a different request.")
-                return ConversationResponse.model_validate_json(cached["response"])
-            now = self.clock()
-            state = self.repository.load_session(db, request.sessionId)
-            if state is None:
-                if request.action != "start":
-                    raise ConversationError(404, "Session not found. Start a new conversation.")
-                if request.revision != 0:
-                    raise ConversationError(409, "A new session must start at revision zero.")
-                if self.catalog is None or self.model is None:
-                    raise IntegrationUnavailable()
-                try:
-                    catalog = approved_catalog(
-                        Catalog.model_validate(self.catalog.load()), allow_demo=self.allow_demo,
-                    )
-                except ConversationError:
-                    raise
-                except Exception as exc:
-                    raise IntegrationUnavailable() from exc
-                state = {
-                    "catalog": catalog.model_dump(mode="json"), "revision": 0,
-                    "answers": [], "proposal": None, "type": "message", "actions": [],
-                    "canMessage": True, "currentQuestion": catalog.questions[0].id,
-                    "expiresAt": now + self.session_ttl, "profileVersion": 0,
-                }
-            else:
-                if state["expiresAt"] <= now:
-                    raise ConversationError(410, "Session expired. Start a new conversation.")
-                if request.revision != state["revision"]:
+                return SessionSnapshot.model_validate_json(cached["response"])
+            extra = {}
+            if action != "start":
+                state = self._v1_state(db, session_id)
+                if command.expected_revision != state["revision"]:
                     raise ConversationError(409, "Session revision has changed.")
-                if request.action == "start":
-                    raise ConversationError(409, "Session already exists. Use a new session identifier.")
-            catalog = Catalog.model_validate(state["catalog"])
-            answers = [Answer.model_validate(a) for a in state["answers"]]
-            response = self._advance(request, state, catalog, answers, db, now)
-            state.update(
-                revision=response.revision, answers=[a.model_dump(mode="json") for a in response.confirmedAnswers],
-                proposal=response.proposal.model_dump(mode="json") if response.proposal else None,
-                type=response.type, actions=[a.model_dump(mode="json") for a in response.actions],
-                canMessage=response.canMessage,
-            )
-            self.repository.store_session(db, request.sessionId, state)
-            self.repository.store_request(db, request.sessionId, request.requestId,
-                                          fingerprint, response.model_dump_json())
-            return response
+                # Only commands actually advertised by this milestone are accepted.
+                if action not in snapshot_for(session_id, state).allowed_actions:
+                    raise ConversationError(422, "This action is not available in the current state.")
+            if action == "message":
+                assert isinstance(command, MessageCommand)
+                extra["message"] = {"role": "user", "text": command.text}
+            elif action == "confirm":
+                assert isinstance(command, ConfirmationCommand)
+                if command.proposal_id != state["proposalId"] or not state["proposal"]:
+                    raise ConversationError(422, "Review the current proposal before confirming.")
+                extra.update(
+                    questionId=state["proposal"]["questionId"], optionId=state["proposal"]["optionId"],
+                    explicitConfirmation=command.explicit_confirmation,
+                )
+            self._send(ConversationRequest(
+                sessionId=session_id, requestId=command.request_id, revision=command.expected_revision,
+                action=action, **extra,
+            ), db, cache_request=False)
+            state = self.repository.load_session(db, session_id)
+            state["apiVersion"] = 1
+            result = snapshot_for(session_id, state)
+            self.repository.store_session(db, session_id, state)
+            if action == "start":
+                self.repository.store_creation(db, command.request_id, session_id)
+            self.repository.store_request(db, session_id, command.request_id, fingerprint, result.model_dump_json())
+            return result
 
     def _advance(self, request, state, catalog, answers, db, now) -> ConversationResponse:
         actions = []

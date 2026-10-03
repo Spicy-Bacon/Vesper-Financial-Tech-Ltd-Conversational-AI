@@ -32,6 +32,10 @@ class ProfileRepository:
                     UNIQUE (session_id, version),
                     FOREIGN KEY (session_id) REFERENCES sessions(id)
                 );
+                CREATE TABLE IF NOT EXISTS v1_creations (
+                    request_id TEXT PRIMARY KEY, session_id TEXT NOT NULL UNIQUE,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                );
             """)
 
     @contextmanager
@@ -58,6 +62,18 @@ class ProfileRepository:
     def load_session(self, db: sqlite3.Connection, session_id: str) -> dict | None:
         row = db.execute("SELECT state FROM sessions WHERE id = ?", (session_id,)).fetchone()
         return json.loads(row["state"]) if row else None
+
+    def creation_session(self, db: sqlite3.Connection, request_id: str) -> str | None:
+        row = db.execute(
+            "SELECT session_id FROM v1_creations WHERE request_id = ?", (request_id,),
+        ).fetchone()
+        return row["session_id"] if row else None
+
+    def store_creation(self, db: sqlite3.Connection, request_id: str, session_id: str) -> None:
+        db.execute(
+            "INSERT INTO v1_creations (request_id, session_id) VALUES (?, ?)",
+            (request_id, session_id),
+        )
 
     def store_session(self, db: sqlite3.Connection, session_id: str, state: dict) -> None:
         db.execute(
