@@ -1,6 +1,8 @@
 # Conversation backend
 
-FastAPI orchestration matching the frontend snapshot contract in [API.md](../API.md).
+FastAPI orchestration implementing the existing `/api/conversation` snapshot contract.
+[API.md](../API.md) now describes the React frontend's TARGET `/api/v1` contract;
+CS2 will adapt the backend in later work. This baseline does not connect the two APIs.
 Harry/CS3 own the real catalog importer, retrieval and model adapter. Finance owns approved
 question meanings, option meanings, safety requirements, points and formulas. The backend
 contains no financial scoring formula.
@@ -9,21 +11,23 @@ contains no financial scoring formula.
 
 ```powershell
 python -m venv backend/.venv
-& .\backend\.venv\Scripts\python.exe -m pip install -r backend/requirements-dev.txt
+& .\backend\.venv\Scripts\python.exe -m pip install -r backend/requirements-dev.txt 'pydantic>=2.12,<3'
 $env:VESPER_DEMO = '1'
 $env:VESPER_MODEL_BACKEND = 'unconfigured'
-& .\backend\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8765 --no-access-log
+$env:VESPER_SERVE_FRONTEND = '0'
+& .\backend\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8001 --no-access-log
 ```
 
-The environment is already installed in this workspace. If `python` is missing from PATH,
+The Pydantic minimum also satisfies the isolated model module's `pyproject.toml`.
+If `python` is missing from PATH,
 use the full path to your installed Python for the first command. No activation is required.
 For the exact tested Windows/Python 3.13 environment, install `backend/requirements-lock.txt`
 instead of the ranged development requirements.
 
-Open **http://127.0.0.1:8765/** to try the existing frontend against this backend. This origin
-serves a public HTTP configuration override; `src/config.js` is unchanged. Port 5173 remains
-the original browser-only scripted demo. Set `VESPER_SERVE_FRONTEND=0` for API-only hosting.
-Interactive API documentation is at `/docs`; the demo catalog is at `/api/catalog`.
+Open **http://127.0.0.1:8001/docs** for the existing API; the demo catalog is at `/api/catalog`.
+The React frontend runs separately on port 5173 in scripted demo mode. API-only hosting is now
+the default. Keep `VESPER_SERVE_FRONTEND=0`: the optional legacy preview module references the
+removed root web app and is not supported in this baseline.
 
 Demo selections are exact option IDs, not natural-language interpretation:
 
@@ -53,7 +57,7 @@ VESPER_DEMO=0
 VESPER_DEMO_CATALOG=1
 ```
 
-Keep `OMLX_API_KEY` in `.env`. Run the same Uvicorn command on port 8765, without setting
+Keep `OMLX_API_KEY` in `.env`. Run the same Uvicorn command on port 8001, without setting
 `VESPER_DEMO=1`. If you previously ran the scripted demo, clear those shell overrides with
 `Remove-Item Env:VESPER_DEMO,Env:VESPER_MODEL_BACKEND -ErrorAction SilentlyContinue`.
 The model-assisted demo asks natural-language questions. Only suggestions are model-generated;
@@ -69,7 +73,7 @@ Check reachability and the exact model ID without sending conversation text:
 oMLX normally runs on an Apple Silicon Mac. `127.0.0.1` refers to the computer running this
 Python backend. If oMLX is on another computer, use a reachable hostname/IP or an authenticated
 local tunnel in `OMLX_BASE_URL`. A 404 from `/v1/models` means the configured address is not
-serving the expected endpoint. Keep the backend on port 8765 and oMLX on its own port.
+serving the expected endpoint. Keep the backend on port 8001 and oMLX on port 8000.
 
 The adapter sends non-streaming `/v1/chat/completions`, requests JSON output, disables thinking
 through `chat_template_kwargs`, and independently validates model JSON/option IDs. HTTP errors,
@@ -113,9 +117,9 @@ errors do not echo user input. Run without access logs as above to avoid logging
 & .\backend\.venv\Scripts\python.exe -m pytest backend/tests -q
 ```
 
-With the demo server running, `node backend/scripts/check-demo.mjs` verifies the complete
-HTTP journey against the frontend's actual response validator. It saves one marked fictional
-test profile in the local demo database.
+The historical `backend/scripts/check-demo.mjs` depends on the removed root frontend validator
+and must not be used with this baseline. The Python tests cover the existing backend demo journey;
+the React frontend has its own unit and browser tests at the repository root.
 
 Tests use synthetic catalogs and policy outputs, not Finance-approved formulas. They cover API
 validation, canonical proposals, explicit safety confirmation, pause/resume, revisions, key

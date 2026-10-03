@@ -1,6 +1,30 @@
 # The Careful Conversation
 
-Frontend for the Vesper hackathon, updated against **Careful Conversation Product and Build Spec v1.0 (3 October 2026)**. React + TypeScript + Vite, with npm workspaces. The existing calm visual style is retained. There is no backend, model runtime, approved workbook or detector in this checkout.
+Shared baseline for the Vesper hackathon: the React/TypeScript/Vite frontend, FastAPI conversation backend, and existing model/RAG module. The frontend targets **Careful Conversation Product and Build Spec v1.0 (3 October 2026)**.
+
+The frontend expects `/api/v1`; the backend currently implements `/api/conversation`. They are not yet connected. CS2 will adapt the backend to [API.md](API.md). The backend currently uses `OmlxAdapter`; the separate model/RAG module is not wired into that flow.
+
+## Team services
+
+| Service | Address | Current use |
+| --- | --- | --- |
+| Frontend | http://localhost:5173 | React/Vite, scripted demo by default |
+| Backend | http://127.0.0.1:8001 | Existing conversation API and `/docs` |
+| oMLX | http://127.0.0.1:8000 | Separately installed local model server |
+
+## Backend setup
+
+Use Python 3.11+ from the repository root. On macOS/Linux:
+
+```sh
+python3 -m venv backend/.venv
+backend/.venv/bin/python -m pip install -r backend/requirements-dev.txt 'pydantic>=2.12,<3'
+VESPER_SERVE_FRONTEND=0 VESPER_DEMO=1 VESPER_MODEL_BACKEND=unconfigured backend/.venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8001 --no-access-log
+```
+
+Open http://127.0.0.1:8001/docs for the fictional backend API. Run `backend/.venv/bin/python -m pytest backend/tests -q` for the combined backend/model tests. The Pydantic minimum also satisfies `backend/pyproject.toml`; that file and its uv lock describe the isolated model module, not the full FastAPI environment.
+
+See [backend/README.md](backend/README.md) for PowerShell and oMLX setup and [backend/MODEL_RAG.md](backend/MODEL_RAG.md) for the existing inference module. Model credentials stay in ignored server-side configuration. The legacy root web app was removed by the frontend branch; keep `VESPER_SERVE_FRONTEND=0`, including in any existing root `.env`.
 
 ## Run
 
@@ -32,9 +56,9 @@ Browser tests start isolated Vite instances on ports 5173 and 5174 and use isola
 - Accepted-profile export only after a receipt, with simulated exports clearly named. Audit export is a separate explicit action with a warning that it includes messages.
 - Keyboard controls, native confirmation dialogs, mobile layout, in-memory state and no analytics or conversation logging.
 
-## Connect your teammate's FastAPI service
+## Target FastAPI integration
 
-Copy `frontend/.env.example` to `frontend/.env.local`, set `VITE_API_MODE=http`, and restart Vite. Run FastAPI on port **8001**; Vite proxies `/api` to that port. The browser never calls the model server (oMLX on port 8000 in the team plan).
+After CS2 implements the target contract, copy `frontend/.env.example` to `frontend/.env.local`, set `VITE_API_MODE=http`, and restart Vite. Run FastAPI on port **8001**; Vite proxies `/api` to that port. Until then, keep demo mode to exercise the React UI. The browser never calls the model server (oMLX on port 8000 in the team plan).
 
 [API.md](API.md) documents the exact frontend contract. The PDF supplies routes and a partial snapshot; [frontend/src/api/contracts.ts](frontend/src/api/contracts.ts) defines the additional render fields that the backend teammate must agree and return. Use `allowed_actions` and the returned snapshot as the source of truth. No model credentials belong in Vite variables.
 

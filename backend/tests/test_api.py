@@ -86,13 +86,13 @@ def test_demo_is_exact_selection_and_cannot_mix_live_integrations(repository):
         create_app(repository=repository, demo=True, model=TestModel())
 
 
-def test_same_origin_frontend_uses_backend_transport(repository):
-    with TestClient(create_app(repository=repository, demo=True, serve_frontend=True)) as client:
-        home = client.get("/")
-        assert home.status_code == 200 and "The Careful Conversation" in home.text
-        configuration = client.get("/src/config.js")
-        assert "mode: 'http'" in configuration.text
-        assert configuration.headers["cache-control"] == "no-store"
-        for asset in ["app.js", "service.js", "style.css", "demo.js"]:
-            assert client.get("/src/" + asset).status_code == 200
+def test_backend_defaults_to_api_only_after_legacy_frontend_removal(repository):
+    from backend.app.settings import Settings
+
+    assert Settings().VESPER_SERVE_FRONTEND is False
+    with TestClient(create_app(repository=repository, demo=True)) as client:
+        assert client.get("/health").status_code == 200
+        assert client.get("/api/catalog").status_code == 200
+        assert client.get("/").status_code == 404
+        assert client.get("/src/config.js").status_code == 404
         assert client.get("/src/../backend/data/profiles.sqlite3").status_code == 404

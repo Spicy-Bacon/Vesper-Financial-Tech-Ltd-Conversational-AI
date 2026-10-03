@@ -17,7 +17,7 @@ class Settings(BaseModel):
     VESPER_MODEL_BACKEND: Literal["unconfigured", "omlx"] = "unconfigured"
     VESPER_DEMO: bool = False
     VESPER_DEMO_CATALOG: bool = False
-    VESPER_SERVE_FRONTEND: bool = True
+    VESPER_SERVE_FRONTEND: bool = False
 
     @field_validator("OMLX_BASE_URL")
     @classmethod

@@ -1,6 +1,6 @@
 # Proposed handoff to Harry/CS3 and Finance
 
-Status: contracts prepared for review; no external agreement or teammate contact has occurred.
+Status: existing Python integration interfaces, preserved in the shared team baseline. The target HTTP contract is now [../API.md](../API.md), using `/api/v1`. The backend still implements `/api/conversation`; CS2 will adapt it in later work. No external agreement or teammate contact has occurred.
 Harry/CS3's catalog is not available yet. The opt-in demo exists only to exercise the backend.
 Replace it through dependency injection. A separate thin `app/adapters/omlx.py` client was added
 for the user's supplied OpenAI-compatible server and model; the scripted adapter remains separate.
@@ -9,7 +9,7 @@ Harry/CS3 retain the real importer, retrieval and final model adapter integratio
 ## Harry/CS3 interfaces
 
 The proposed Python contracts are in `app/interfaces.py` and the Pydantic shapes are in
-`app/schemas.py`. Calls are synchronous because the route runs in FastAPI's worker thread.
+`app/schemas/__init__.py`. Calls are synchronous because the route runs in FastAPI's worker thread.
 Use a synchronous wrapper if the underlying adapter is async. Do not block the event loop.
 Raise on unavailable integrations and enforce connection/request timeouts in adapters.
 

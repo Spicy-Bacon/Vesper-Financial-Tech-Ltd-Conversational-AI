@@ -1,6 +1,8 @@
 # Frontend contract aligned to product spec v1.0
 
-The group leader's PDF (section 9) replaces the earlier single `/api/conversation` proposal. The frontend now calls relative `/api/v1` routes. Backend code is not implemented here. The backend teammate must agree the render fields below before integration; the PDF's snapshot was only a partial example.
+The group leader's PDF (section 9) replaces the earlier single `/api/conversation` proposal. The frontend now calls relative `/api/v1` routes. This is the TARGET contract: the preserved FastAPI backend currently implements `/api/conversation`, `/api/catalog`, `/health` and `/ready`. CS2 will adapt it in subsequent work. The backend teammate must agree the render fields below before integration; the PDF's snapshot was only a partial example.
+
+The existing backend provides canonical option validation, explicit confirmation, SQLite transactions and idempotent retries under its older request/snapshot shape. See [backend/INTEGRATIONS.md](backend/INTEGRATIONS.md) for its existing Python interfaces. These implementation notes do not change the target routes below.
 
 ## Transport
 
