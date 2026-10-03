@@ -1,5 +1,7 @@
 # The Careful Conversation
 
+For the 4 October two-person demo-polish session, read [START_HERE](docs/ai-context/START_HERE.md). It records the inspected implementation; some baseline guidance below is historical.
+
 Shared baseline for the Vesper hackathon: the React/TypeScript/Vite frontend, FastAPI conversation backend, and existing model/RAG module. The frontend targets **Careful Conversation Product and Build Spec v1.0 (3 October 2026)**.
 
 The frontend expects `/api/v1`; the backend currently implements `/api/conversation`. They are not yet connected. CS2 will adapt the backend to [API.md](API.md). The backend currently uses `OmlxAdapter`; the separate model/RAG module is not wired into that flow.
