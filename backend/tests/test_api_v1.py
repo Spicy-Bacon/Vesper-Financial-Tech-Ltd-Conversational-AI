@@ -159,13 +159,16 @@ def test_retries_return_original_full_snapshots_after_later_revisions(v1, v1_app
     assert len(latest["confirmed_answers"]) == 1
 
 
-@pytest.mark.parametrize("action", ["start", "messages", "confirmations"])
+@pytest.mark.parametrize("action", ["start", "messages", "confirmations", "resume"])
 def test_concurrent_identical_retries_have_one_effect(v1, v1_app, action):
     if action != "start":
         v1.send("start")
     if action == "confirmations":
         v1.propose()
         body = v1.body(proposal_id=v1.snapshot["pending_proposal"]["proposal_id"], explicit_confirmation=True)
+    elif action == "resume":
+        v1.propose("pause")
+        body = v1.body()
     else:
         body = v1.body(**({"text": "a"} if action == "messages" else {}))
     with ThreadPoolExecutor(max_workers=3) as pool:
@@ -201,12 +204,15 @@ def test_get_and_messages_use_pinned_catalog_without_reloading(v1, v1_app):
     assert provider.calls == 1
 
 
-@pytest.mark.parametrize("action", ["messages", "confirmations"])
+@pytest.mark.parametrize("action", ["messages", "confirmations", "resume"])
 def test_stale_revision_does_not_change_state(v1, v1_app, action):
     v1.send("start")
     if action == "confirmations":
         v1.propose()
         extra = {"proposal_id": v1.snapshot["pending_proposal"]["proposal_id"], "explicit_confirmation": True}
+    elif action == "resume":
+        v1.propose("pause")
+        extra = {}
     else:
         extra = {"text": "a"}
     before = v1.snapshot
@@ -243,7 +249,7 @@ def test_safety_requires_explicit_check_but_non_safety_requires_only_confirm_act
     assert len(confirmed["confirmed_answers"]) == 2
 
 
-@pytest.mark.parametrize("action", ["start", "messages", "confirmations"])
+@pytest.mark.parametrize("action", ["start", "messages", "confirmations", "resume"])
 def test_conflicting_idempotency_keys_are_rejected_before_current_state_checks(v1, action):
     if action != "start":
         v1.send("start")
@@ -253,6 +259,9 @@ def test_conflicting_idempotency_keys_are_rejected_before_current_state_checks(v
         change = {"proposal_id": "foreign"}
     elif action == "messages":
         body, change = v1.body(text="a"), {"text": "u"}
+    elif action == "resume":
+        v1.propose("pause")
+        body, change = v1.body(), {"expected_revision": 0}
     else:
         body, change = v1.body(), {"expected_revision": 1}
     original = v1.send(action, **body)
@@ -299,12 +308,16 @@ def test_failed_integrations_roll_back_and_same_request_can_retry(v1, v1_app, re
     assert retried["confirmed_answers"] == [] and retried["pending_proposal"] is not None
 
 
-@pytest.mark.parametrize("action", ["start", "confirmations"])
+@pytest.mark.parametrize("action", ["start", "confirmations", "resume"])
 def test_storage_failure_rolls_back_creation_or_confirmation_and_retry_cache(v1, repository, monkeypatch, action):
     if action == "confirmations":
         v1.send("start")
         before = v1.propose()
         body = v1.body(proposal_id=before["pending_proposal"]["proposal_id"], explicit_confirmation=True)
+    elif action == "resume":
+        v1.send("start")
+        before = v1.propose("pause")
+        body = v1.body()
     else:
         body = v1.body()
     original_store = repository.store_request
@@ -325,9 +338,9 @@ def test_storage_failure_rolls_back_creation_or_confirmation_and_retry_cache(v1,
             assert repository.load_session(db, before["session_id"])["answers"] == []
             assert repository.cached_request(db, before["session_id"], body["request_id"]) is None
     monkeypatch.setattr(repository, "store_request", original_store)
-    if action == "confirmations":
+    if action != "start":
         assert v1.load().json() == before
-    assert v1.send(action, **body)["revision"] == (1 if action == "start" else 3)
+    assert v1.send(action, **body)["revision"] == (1 if action == "start" else before["revision"] + 1)
 
 
 @pytest.mark.parametrize("kind", ["ambiguous", "pause", "support"])
@@ -339,7 +352,7 @@ def test_clarification_and_vulnerable_user_handling_do_not_confirm_or_guess(v1, 
         assert result["state"] == "ASKING" and result["response_type"] == "clarification"
         assert result["allowed_actions"] == ["message"]
     else:
-        assert result["state"] == "PAUSED" and result["allowed_actions"] == []
+        assert result["state"] == "PAUSED" and result["allowed_actions"] == ["resume"]
         assert result["response_type"] == ("paused" if kind == "pause" else "support")
         assert v1.post("messages", v1.body(text="a")).status_code == 422
     assert v1.load().json() == result
@@ -463,7 +476,78 @@ def test_paused_snapshot_and_identical_retry_survive_app_restart(repository, kin
             assert restarted_repository.load_session(db, paused["session_id"]) == state
             assert state["currentQuestion"] == "S2"
         assert restarted_repository.list_for_session(paused["session_id"]) == []
+
+        # Resume recovered state without a model, then replay both old commands.
+        journey = V1Journey(client)
+        journey.snapshot = paused
+        resume_body = journey.body()
+        resumed = journey.send("resume", **resume_body)
+        assert resumed["state"] == "ASKING" and resumed["active_question"]["question_id"] == "S2"
+        assert resumed["confirmed_answers"] == paused["confirmed_answers"]
+        assert journey.post("messages", body).json() == paused
+        assert journey.load().json() == resumed
+
+    with TestClient(create_app(repository=ProfileRepository(repository.path))) as client:
+        assert client.get(url).json() == resumed
+        retry = client.post(f"{url}/resume", json=resume_body,
+                            headers={"Idempotency-Key": resume_body["request_id"]})
+        assert retry.status_code == 200 and retry.json() == resumed
+        assert client.get(url).json() == resumed
     assert model.calls == 2
+
+
+@pytest.mark.parametrize("kind", ["pause", "support"])
+def test_resume_returns_to_same_question_without_accepting_or_scoring(v1, v1_app, repository, monkeypatch, kind):
+    """Scripted adapter outcomes exercise the real V1 Resume command."""
+    v1.send("start")
+    v1.propose("u")
+    before = v1.confirm()
+    paused = v1.propose(kind)
+    service = v1_app.state.conversation
+    score = Mock(wraps=service.scoring.score)
+    save = Mock(wraps=repository.save)
+    monkeypatch.setattr(service.scoring, "score", score)
+    monkeypatch.setattr(repository, "save", save)
+    calls = service.model.calls
+
+    resumed = v1.send("resume")
+    assert resumed["revision"] == paused["revision"] + 1
+    assert resumed["state"] == "ASKING" and resumed["allowed_actions"] == ["message"]
+    assert resumed["response_type"] == "message"
+    assert resumed["active_question"] == before["active_question"]
+    assert resumed["assistant_message"] == before["active_question"]["text"]
+    assert resumed["confirmed_answers"] == before["confirmed_answers"]
+    assert resumed["pending_proposal"] is resumed["receipt"] is None
+    assert resumed["review"] is resumed["review_version"] is None
+    assert v1.load().json() == resumed
+    assert service.model.calls == calls
+    # Continue only by obtaining and explicitly confirming a fresh proposal.
+    proposal = v1.propose("a")
+    assert proposal["state"] == "AWAITING_CONFIRMATION"
+    assert proposal["pending_proposal"]["question_id"] == before["active_question"]["question_id"]
+    assert proposal["confirmed_answers"] == before["confirmed_answers"]
+    assert len(v1.confirm()["confirmed_answers"]) == 2
+    score.assert_not_called()
+    save.assert_not_called()
+    assert repository.list_for_session(resumed["session_id"]) == []
+
+
+@pytest.mark.parametrize("stage", ["ASKING", "AWAITING_CONFIRMATION", "REVIEW", "SAVED"])
+def test_resume_is_rejected_outside_paused_state(v1, stage):
+    v1.send("start")
+    if stage == "AWAITING_CONFIRMATION":
+        v1.propose()
+    elif stage in {"REVIEW", "SAVED"}:
+        for _ in range(6):
+            v1.propose()
+            v1.confirm()
+        if stage == "SAVED":
+            v1.send("finalize", review_version=v1.snapshot["review_version"])
+    before = v1.snapshot
+    response = v1.post("resume", v1.body())
+    assert response.status_code == 422
+    assert response.json() == {"detail": "This action is not available in the current state."}
+    assert v1.load().json() == before
 
 
 def test_confirmed_unsure_is_explicit_and_six_answers_produce_valid_read_only_review(v1):
@@ -523,13 +607,16 @@ def test_incomplete_catalog_metadata_is_rejected_without_fabrication(v1, v1_app,
 
 
 @pytest.mark.parametrize("headers", [{}, {"Idempotency-Key": "different"}])
-@pytest.mark.parametrize("action", ["start", "messages", "confirmations"])
+@pytest.mark.parametrize("action", ["start", "messages", "confirmations", "resume"])
 def test_missing_or_mismatched_keys(v1, headers, action):
     if action != "start":
         v1.send("start")
     if action == "confirmations":
         v1.propose()
         body = v1.body(proposal_id=v1.snapshot["pending_proposal"]["proposal_id"])
+    elif action == "resume":
+        v1.propose("pause")
+        body = v1.body()
     else:
         body = v1.body(**({"text": "a"} if action == "messages" else {}))
     url = "/api/v1/sessions" + (f"/{v1.snapshot['session_id']}/{action}" if action != "start" else "")
@@ -543,11 +630,12 @@ def test_invalid_creation_payloads_are_safe(v1, bad):
     assert v1.post("start", v1.body(**bad)).status_code == 422
 
 
-def test_only_four_routes_and_protocols_cannot_mutate_each_others_sessions(v1, v1_app):
+def test_v1_routes_and_protocols_cannot_mutate_each_others_sessions(v1, v1_app):
     paths = {path for path in v1_app.openapi()["paths"] if path.startswith("/api/v1")}
     assert paths == {"/api/v1/sessions", "/api/v1/sessions/{session_id}",
                      "/api/v1/sessions/{session_id}/messages", "/api/v1/sessions/{session_id}/confirmations",
-                     "/api/v1/sessions/{session_id}/finalize", "/api/v1/sessions/{session_id}/corrections"}
+                     "/api/v1/sessions/{session_id}/finalize", "/api/v1/sessions/{session_id}/corrections",
+                     "/api/v1/sessions/{session_id}/resume"}
     initial = v1.send("start")
     body = {"sessionId": initial["session_id"], "requestId": "legacy-command", "revision": 1,
             "action": "message", "message": {"text": "a"}}
@@ -576,7 +664,7 @@ def test_snapshots_pass_actual_unchanged_frontend_zod_contract(v1):
     for _ in range(5):
         snapshots.extend([v1.propose(), v1.confirm()])
     other = V1Journey(v1.client)
-    snapshots.extend([other.send("start"), other.propose("support")])
+    snapshots.extend([other.send("start"), other.propose("support"), other.send("resume")])
     runner = r"""
         import {readFileSync} from 'node:fs';
         import {stripTypeScriptTypes} from 'node:module';

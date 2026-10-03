@@ -172,7 +172,7 @@ def snapshot_for(session_id: str, state: dict) -> SessionSnapshot:
         )
         stage, actions = "AWAITING_CONFIRMATION", ["confirm", "change"]
     elif state["type"] in {"pause", "support"}:
-        stage, actions = "PAUSED", []
+        stage, actions = "PAUSED", ["resume"]
         active = None
     elif state["type"] == "final_playback":
         stage, actions = "REVIEW", ["finalize"]

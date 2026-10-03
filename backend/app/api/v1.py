@@ -35,6 +35,12 @@ def message(session_id: str, body: MessageCommand, request: Request, idempotency
     return request.app.state.conversation.send_v1("message", body, session_id)
 
 
+@router.post("/sessions/{session_id}/resume", response_model=SessionSnapshot)
+def resume(session_id: str, body: SessionCommand, request: Request, idempotency_key: Key):
+    check_key(body, idempotency_key)
+    return request.app.state.conversation.send_v1("resume", body, session_id)
+
+
 @router.post("/sessions/{session_id}/confirmations", response_model=SessionSnapshot)
 def confirm(session_id: str, body: ConfirmationCommand, request: Request, idempotency_key: Key):
     check_key(body, idempotency_key)

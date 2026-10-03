@@ -122,7 +122,7 @@ class ConversationService:
         self, action: str, command: SessionCommand, session_id: str | None = None,
     ) -> SessionSnapshot:
         """Translate commands, then use _send/_advance in the same SQLite transaction."""
-        if action not in {"start", "message", "confirm", "finalize", "change"}:
+        if action not in {"start", "message", "confirm", "finalize", "change", "resume"}:
             raise ConversationError(422, "This versioned action is not implemented.")
         with self.repository.transaction() as db:
             if action == "start":
