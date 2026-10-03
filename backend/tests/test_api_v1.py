@@ -10,12 +10,14 @@ import sqlite3
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
 from backend.app.main import create_app
+from backend.app.repositories.profiles import ProfileRepository
 from backend.app.schemas import Catalog, Interpretation
 from backend.app.schemas.v1 import SessionSnapshot
 
@@ -341,6 +343,127 @@ def test_clarification_and_vulnerable_user_handling_do_not_confirm_or_guess(v1, 
         assert result["response_type"] == ("paused" if kind == "pause" else "support")
         assert v1.post("messages", v1.body(text="a")).status_code == 422
     assert v1.load().json() == result
+
+
+@pytest.mark.parametrize("text, kind", [
+    pytest.param("In this fictional scenario I am overwhelmed and cannot continue.",
+                 "support", id="distress"),
+    pytest.param("In this fictional scenario someone is pressuring me to choose a riskier answer.",
+                 "support", id="pressure"),
+    pytest.param("I refuse to answer this fictional question. Do not record me as unsure.",
+                 "pause", id="refusal"),
+    pytest.param("For this fictional scenario I want to speak to a human before continuing.",
+                 "support", id="human-help"),
+])
+def test_mocked_vulnerable_response_preserves_answers_and_blocks_acceptance(
+    v1, v1_app, repository, monkeypatch, text, kind,
+):
+    """Inject adapter outcomes; this does not test actual model recognition of prose."""
+    v1.send("start")
+    proposal = v1.propose()
+    previous_proposal_id = proposal["pending_proposal"]["proposal_id"]
+    before = v1.confirm()
+    session_id = before["session_id"]
+    with repository.transaction() as db:
+        before_state = repository.load_session(db, session_id)
+
+    service = v1_app.state.conversation
+    interpretation = Mock(return_value=Interpretation(kind=kind))
+    score = Mock(wraps=service.scoring.score)
+    save = Mock(wraps=repository.save)
+    monkeypatch.setattr(service.model, "interpret", interpretation)
+    monkeypatch.setattr(service.scoring, "score", score)
+    monkeypatch.setattr(repository, "save", save)
+
+    body = v1.body(text=text)
+    paused = v1.send("messages", **body)
+    assert paused["state"] == "PAUSED"
+    assert paused["response_type"] == ("paused" if kind == "pause" else "support")
+    assert paused["revision"] == before["revision"] + 1
+    assert paused["pending_proposal"] is paused["receipt"] is None
+    assert paused["review"] is paused["review_version"] is None
+    assert paused["confirmed_answers"] == before["confirmed_answers"]
+    assert not any(answer["is_unsure"] for answer in paused["confirmed_answers"])
+
+    # PAUSED hides the active question on the wire; inspect its persisted position.
+    with repository.transaction() as db:
+        paused_state = repository.load_session(db, session_id)
+    assert paused_state["currentQuestion"] == before_state["currentQuestion"] == "S2"
+    assert paused_state["answers"] == before_state["answers"]
+    assert paused_state["proposal"] is None
+    assert paused_state["canMessage"] is False
+    assert paused_state["profileVersion"] == 0
+    assert paused_state.get("acceptedProfile") is None
+
+    # Well-formed commands at the current revision must fail at the state gate.
+    for action, extra in [
+        ("confirmations", {"proposal_id": previous_proposal_id, "explicit_confirmation": True}),
+        ("finalize", {"review_version": str(uuid4())}),
+    ]:
+        blocked_body = v1.body(**extra)
+        response = v1.post(action, blocked_body)
+        assert response.status_code == 422
+        assert response.json() == {"detail": "This action is not available in the current state."}
+        assert v1.load().json() == paused
+        with repository.transaction() as db:
+            assert repository.load_session(db, session_id) == paused_state
+            assert repository.cached_request(db, session_id, blocked_body["request_id"]) is None
+
+    for _ in range(2):
+        retry = v1.post("messages", body)
+        assert retry.status_code == 200
+        assert retry.json() == paused
+    assert v1.load().json() == paused
+    with repository.transaction() as db:
+        assert repository.load_session(db, session_id) == paused_state
+    interpretation.assert_called_once()
+    assert interpretation.call_args.kwargs["text"] == text
+    assert interpretation.call_args.kwargs["question"].id == "S2"
+    score.assert_not_called()
+    save.assert_not_called()
+    assert repository.list_for_session(session_id) == []
+
+
+@pytest.mark.parametrize("kind", ["pause", "support"])
+def test_paused_snapshot_and_identical_retry_survive_app_restart(repository, kind):
+    """Scripted adapter fixture, real API/SQLite recovery; no live model call."""
+    model = SyntheticModel()
+    app = create_app(repository=repository, catalog=SyntheticSixCatalog(), model=model)
+    app.state.conversation.allow_demo = True
+    with TestClient(app) as client:
+        journey = V1Journey(client)
+        journey.send("start")
+        journey.propose("u")  # Existing Unsure is explicitly confirmed, never inferred.
+        confirmed = journey.confirm()
+        body = journey.body(text=kind)
+        paused = journey.send("messages", **body)
+        assert paused["confirmed_answers"] == confirmed["confirmed_answers"]
+        assert paused["confirmed_answers"][0]["is_unsure"] is True
+        assert journey.load().json() == paused
+        assert model.calls == 2
+        with repository.transaction() as db:
+            state = repository.load_session(db, paused["session_id"])
+
+    # Close the original app, reopen the same DB with a fresh repository/service.
+    restarted_repository = ProfileRepository(repository.path)
+    restarted_app = create_app(repository=restarted_repository)
+    url = f"/api/v1/sessions/{paused['session_id']}"
+    with TestClient(restarted_app) as client:
+        recovered = client.get(url)
+        assert recovered.status_code == 200
+        assert recovered.headers["cache-control"] == "no-store"
+        assert recovered.json() == paused
+        retry = client.post(f"{url}/messages", json=body,
+                            headers={"Idempotency-Key": body["request_id"]})
+        assert retry.status_code == 200
+        assert retry.json() == paused
+        assert client.get(url).json() == paused
+        assert restarted_app.state.conversation.model is None
+        with restarted_repository.transaction() as db:
+            assert restarted_repository.load_session(db, paused["session_id"]) == state
+            assert state["currentQuestion"] == "S2"
+        assert restarted_repository.list_for_session(paused["session_id"]) == []
+    assert model.calls == 2
 
 
 def test_confirmed_unsure_is_explicit_and_six_answers_produce_valid_read_only_review(v1):
