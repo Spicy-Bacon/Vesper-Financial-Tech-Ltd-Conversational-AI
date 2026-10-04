@@ -288,6 +288,15 @@ export function AuditPanel({
                 ))}
               </ol>
               {!audit.events.length && <p>No evidence events returned.</p>}
+              {audit.retention_notice && (
+                <p className="subtle">{audit.retention_notice}</p>
+              )}
+              {audit.source_workbook && (
+                <p className="subtle">
+                  Source: {audit.source_workbook} · SHA-256:{" "}
+                  {audit.source_sha256}
+                </p>
+              )}
               <button onClick={() => setAttempt((n) => n + 1)}>
                 Refresh evidence
               </button>{" "}

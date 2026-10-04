@@ -1,11 +1,16 @@
 # Session status and task registry
 
 Date: 4 October 2026, Europe/London. Presentation: Sunday 4 October 2026.
-Inspected branch/base: `main` at `38fcf212f12c675da18cacb8794a259bc862a88f`.
-Initial working tree: clean. Setup scope: documentation only.
-No branch switch, application test, model call or browser reproduction was performed.
-After setup, the user authorized a local documentation commit on 4 October 2026.
-No push or merge was authorized. The inspected application baseline remains `38fcf21`.
+Morning authorization update: the user subsequently requested **commit and push**
+of VP-001 on `feature/harry-demo-polish`. This supersedes the overnight prohibition
+on those actions. No merge is authorized. Uncommitted references below describe
+the overnight handoff snapshot; use Git history for the resulting commit.
+Current inspected branch/base: `feature/harry-demo-polish` at
+`d3de1acd2e0ff0db4d8c1a915c597efa9a77e60e`. Initially clean; VP-001 changes are
+uncommitted and unstaged. User authorized cross-component presentation fixes;
+explicitly no commit, push, merge or publication. The original documentation setup
+inspected `main` at `38fcf21`; that evidence remains historical below.
+See [current handoff and exact evidence](OVERNIGHT_PROGRESS.md).
 
 ## Proposed working split — awaiting team confirmation
 
@@ -15,7 +20,9 @@ No push or merge was authorized. The inspected application baseline remains `38f
   [handoffs](HANDOFF_TEMPLATE.md); Harry records accepted claims and evidence.
 
 Team confirmation: **pending**. This is not an automatic claim on any directory.
-Active implementation tasks: **none**. Reserved application files: **none**.
+Current task: **VP-001 ready for integration**, owned by Harry's authorized
+integration session. Exact reservations below; no other reservations/newer handoffs
+were found. User's cross-component authorization applies to this task only.
 Each person may hold one task at a time, using a separate branch and local checkout.
 Once confirmed, each person reads the other person's current reservations before edits.
 
@@ -27,8 +34,8 @@ date the observation and distinguish runtime reproduction from source suspicion.
 
 | Task ID | Observed problem | Reproduction | Expected behaviour | Owner | Branch/base commit | Exact reserved files | Acceptance criteria | Verification evidence | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| VP-001 | Wrong Q3 mapping; support/Pause dead ends; disabled review corrections/help; missing evidence | Exact replies/clicks and final results in [handoff](OVERNIGHT_PROGRESS.md) | Correct canonical proposal or clarification; resumable state; renewed confirmation/acceptance; actual evidence; matching export/profile | Harry integration session (user-authorized) | feature/harry-demo-polish / d3de1acd | backend/app/adapters/omlx.py; backend/app/api/v1.py; backend/app/schemas/__init__.py; backend/app/schemas/v1.py; backend/app/services/conversation.py; backend/app/services/retrieval.py; backend/tests/test_api_v1.py; backend/tests/test_omlx.py; frontend/src/App.tsx; frontend/src/api/client.ts; frontend/src/api/contracts.ts; frontend/src/components/Panels.tsx; frontend/tests/adapter.test.ts; docs/ai-context/STATUS.md; docs/ai-context/DECISIONS.md; docs/ai-context/OVERNIGHT_PROGRESS.md | All five reported journeys fixed; ambiguous/contradictory mapping clarifies; explicit confirmations/final save preserved; stale IDs rejected; replay adds no evidence; numeric and Unsure scores agree with persisted receipts | Targeted mocks/contracts; actual Qwen3.5-9B-4bit API; fresh Safari flow; Medium 60 exported JSON equals live receipt/SQLite; live Unsure Not assigned. Exact checks in handoff | Ready for integration; uncommitted; reservations retained |
 
-The registry is intentionally empty. No implementation task has been claimed.
 Use statuses `Unassigned`, `Claimed`, `In progress`, `Blocked`, `Ready for integration`,
 `Integrated` or `Deferred`. A blocked task keeps its reservation until explicitly
 released. Record releases and completed claims; do not silently overwrite the other
@@ -40,6 +47,10 @@ directory names and ownership areas are not exact reservations.
 Observed from source on 4 October 2026 at `38fcf21`. These are context and follow-up
 suggestions, not assigned tasks. Promote one only after observing a specific problem
 and defining a bounded scope and acceptance criteria.
+KG-01 audit, KG-02 review correction and KG-03 pause/resume/end/review help are
+superseded by VP-001's implemented and verified flow. Profile lookup/selections
+remain outside scope. KG-04 general model accuracy and KG-06 reload recovery
+remain limitations; verified examples do not establish general readiness.
 
 | Gap | Source finding | Next observation to consider |
 | --- | --- | --- |
@@ -52,10 +63,12 @@ and defining a bounded scope and acceptance criteria.
 
 ## Newly reproduced bugs
 
-None recorded in this documentation setup. Record exact mode, reply/click sequence,
-observed result, expected result and branch/commit when a teammate actually reproduces one.
+VP-001 reproduced Q3 model-output error and final-review numeric horizon error,
+and completed the reported broken control/evidence journeys. Source diagnosis,
+failed experiments, final actual-Qwen/API/browser evidence and exact reproductions
+are recorded separately in [OVERNIGHT_PROGRESS](OVERNIGHT_PROGRESS.md).
 
-## Verification evidence for this setup
+## Historical verification evidence for the documentation setup
 
 - Read Git state, current implementation and existing repository context docs.
 - Package discovery: no matching ZIP/extracted package found in Downloads; no prior
@@ -65,8 +78,10 @@ observed result, expected result and branch/commit when a teammate actually repr
 
 ## Integration queue
 
-No application changes queued. The user authorized committing these context files
-locally after setup. Harry must share that local commit or the files with the
-teammate's separate checkout/ChatGPT session before relying on them; a clone of
-`38fcf21` alone does not contain this package. No remote publication is authorized.
-Integration/commit/push/merge actions require user authorization for that task.
+VP-001 is an uncommitted diff on the current branch; preserve/apply its backend and
+frontend contracts together. No dependencies, database migration, catalog release
+or Finance policy changes. Product remains running from this checkout. Exact files,
+checks, commands, limitations and presentation script are in the handoff.
+Do not assume another checkout contains these changes. No staging/commit/push/merge
+authorized for this task. Reservations remain until Harry reviews/integrates or
+explicitly releases them. Reload recovery and general model evaluation are deferred.

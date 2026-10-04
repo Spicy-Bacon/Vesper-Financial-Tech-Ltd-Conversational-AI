@@ -91,5 +91,7 @@ class CatalogRetriever:
         result = self._retriever.retrieve(
             catalog_version=self._catalog.version, question_id=active.id, user_reply=text,
         )
-        return [RetrievedContext(sourceId=snippet.content_id, text=snippet.text)
+        return [RetrievedContext(sourceId=snippet.content_id, text=snippet.text,
+                                 source_sheet=snippet.source_sheet, source_row=snippet.source_row,
+                                 retrieval_method=result.retrieval_method)
                 for snippet in result.snippets]

@@ -114,7 +114,7 @@ def v1(v1_client):
 def test_first_question_snapshot_proposal_confirmation_and_get(v1, v1_app, repository):
     initial = v1.send("start")
     assert initial["catalog_status"] == "provisional"
-    assert initial["state"] == "ASKING" and initial["allowed_actions"] == ["message"]
+    assert initial["state"] == "ASKING" and initial["allowed_actions"] == ["message", "pause", "end"]
     assert initial["revision"] == 1 and initial["confirmed_answers"] == []
     assert initial["review"] is initial["review_version"] is initial["receipt"] is None
     assert initial["pending_proposal"] is None
@@ -124,12 +124,12 @@ def test_first_question_snapshot_proposal_confirmation_and_get(v1, v1_app, repos
     assert initial["active_question"]["options"][1]["is_unsure"] is True
     proposed = v1.propose()
     assert proposed["state"] == "AWAITING_CONFIRMATION"
-    assert proposed["allowed_actions"] == ["confirm", "change"] and proposed["confirmed_answers"] == []
+    assert proposed["allowed_actions"] == ["confirm", "change", "pause", "end"] and proposed["confirmed_answers"] == []
     assert proposed["pending_proposal"]["origin"] == "model"
     assert proposed["pending_proposal"]["playback"] == initial["active_question"]["options"][0]["playback"]
     assert v1.load().json() == proposed
     confirmed = v1.confirm()
-    assert confirmed["state"] == "ASKING" and confirmed["allowed_actions"] == ["message"]
+    assert confirmed["state"] == "ASKING" and confirmed["allowed_actions"] == ["message", "pause", "end"]
     assert confirmed["pending_proposal"] is None
     assert confirmed["active_question"]["question_id"] == "S2"
     assert confirmed["confirmed_answers"] == [{
@@ -335,9 +335,9 @@ def test_clarification_and_vulnerable_user_handling_do_not_confirm_or_guess(v1, 
     assert result["pending_proposal"] is None and result["confirmed_answers"] == []
     if kind == "ambiguous":
         assert result["state"] == "ASKING" and result["response_type"] == "clarification"
-        assert result["allowed_actions"] == ["message"]
+        assert result["allowed_actions"] == ["message", "pause", "end"]
     else:
-        assert result["state"] == "PAUSED" and result["allowed_actions"] == []
+        assert result["state"] == "PAUSED" and result["allowed_actions"] == ["resume", "end"]
         assert result["response_type"] == ("paused" if kind == "pause" else "support")
         assert v1.post("messages", v1.body(text="a")).status_code == 422
     assert v1.load().json() == result
@@ -349,12 +349,13 @@ def test_confirmed_unsure_is_explicit_and_six_answers_produce_valid_read_only_re
         proposal = v1.propose("u" if index == 0 else "a")
         assert len(proposal["confirmed_answers"]) == index
         final = v1.confirm()
-    assert final["state"] == "REVIEW" and final["allowed_actions"] == ["finalize"]
+    assert final["state"] == "REVIEW" and final["allowed_actions"] == ["finalize", "change", "explain_review", "message", "pause", "end"]
     assert final["review"]["statements"] == final["confirmed_answers"]
     assert final["confirmed_answers"][0]["is_unsure"] is True
     assert final["review_version"] and final["receipt"] is None
     assert v1.load().json() == final
-    assert v1.post("messages", v1.body(text="a")).status_code == 422
+    assert v1.send("messages", text="yes")["state"] == "REVIEW"
+    assert v1.snapshot["receipt"] is None
 
 
 def test_expiry_preserves_original_retries_but_blocks_get_and_new_work(v1, v1_app):
@@ -424,7 +425,9 @@ def test_only_four_routes_and_protocols_cannot_mutate_each_others_sessions(v1, v
     paths = {path for path in v1_app.openapi()["paths"] if path.startswith("/api/v1")}
     assert paths == {"/api/v1/sessions", "/api/v1/sessions/{session_id}",
                      "/api/v1/sessions/{session_id}/messages", "/api/v1/sessions/{session_id}/confirmations",
-                     "/api/v1/sessions/{session_id}/finalize", "/api/v1/sessions/{session_id}/corrections"}
+                     "/api/v1/sessions/{session_id}/finalize", "/api/v1/sessions/{session_id}/corrections",
+                     "/api/v1/sessions/{session_id}/pause", "/api/v1/sessions/{session_id}/resume",
+                     "/api/v1/sessions/{session_id}/audit"}
     initial = v1.send("start")
     body = {"sessionId": initial["session_id"], "requestId": "legacy-command", "revision": 1,
             "action": "message", "message": {"text": "a"}}
@@ -472,3 +475,111 @@ def test_snapshots_pass_actual_unchanged_frontend_zod_contract(v1):
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout == str(len(snapshots))
+
+
+@pytest.mark.parametrize("stage", ["question", "proposal", "review"])
+def test_pause_resume_restores_place_without_confirming_and_invalidates_identifiers(v1, stage):
+    v1.send("start")
+    v1.propose("u")
+    v1.confirm()
+    if stage == "proposal":
+        v1.propose()
+    elif stage == "review":
+        for _ in range(5):
+            v1.propose()
+            v1.confirm()
+    before = v1.snapshot
+    paused = v1.send("pause")
+    assert paused["state"] == "PAUSED" and paused["confirmed_answers"] == before["confirmed_answers"]
+    assert paused["pending_proposal"] is None
+    resumed = v1.send("resume")
+    assert resumed["state"] == before["state"]
+    assert resumed["confirmed_answers"] == before["confirmed_answers"]
+    assert resumed["active_question"] == before["active_question"]
+    if stage == "proposal":
+        assert resumed["pending_proposal"]["playback"] == before["pending_proposal"]["playback"]
+        assert resumed["pending_proposal"]["proposal_id"] != before["pending_proposal"]["proposal_id"]
+        assert v1.post("confirmations", v1.body(proposal_id=before["pending_proposal"]["proposal_id"], explicit_confirmation=True)).status_code == 422
+    elif stage == "review":
+        assert resumed["review_version"] != before["review_version"]
+        assert v1.post("finalize", v1.body(review_version=before["review_version"])).status_code == 422
+
+
+def test_review_correction_help_stale_acceptance_and_saved_history(v1, repository):
+    v1.send("start")
+    for _ in range(6):
+        v1.propose()
+        v1.confirm()
+    old_version = v1.snapshot["review_version"]
+    v1.send("messages", text="yes")
+    assert v1.snapshot["state"] == "REVIEW" and v1.snapshot["receipt"] is None
+    assert repository.list_for_session(v1.snapshot["session_id"]) == []
+    changed = v1.send("corrections", question_id="S3")
+    assert len(changed["confirmed_answers"]) == 5
+    assert changed["active_question"]["question_id"] == "S3"
+    assert changed["review_version"] is None
+    v1.propose("u")
+    review = v1.confirm()
+    assert review["review_version"] != old_version
+    assert v1.post("finalize", v1.body(review_version=old_version)).status_code == 422
+    body = v1.body(review_version=review["review_version"])
+    saved = v1.send("finalize", **body)
+    assert saved["state"] == "SAVED"
+    assert v1.post("finalize", body).json() == saved
+    profiles = repository.list_for_session(saved["session_id"])
+    assert len(profiles) == 1 and profiles[0].answers[2].optionId == "u"
+    assert v1.post("corrections", v1.body(question_id="S3")).status_code == 422
+    assert repository.list_for_session(saved["session_id"]) == profiles
+
+
+def test_actual_audit_retry_restart_expiry_and_no_durable_raw_reply(v1, v1_app, repository):
+    initial = v1.send("start")
+    body = v1.body(text="fictional ambiguous raw reply")
+    v1.send("messages", **body)
+    assert v1.post("messages", body).status_code == 200
+    url = f"/api/v1/sessions/{initial['session_id']}/audit"
+    audit = v1.client.get(url).json()
+    assert len(audit["events"]) == 2
+    assert audit["events"][1]["raw_reply"] == body["text"]
+    assert audit["events"][1]["model_action"] == "clarification"
+    assert audit["events"][1]["snippets"] == []  # Fixture has no retrieval provenance.
+    assert audit["events"][1]["latency_ms"] >= 0
+    with repository.transaction() as db:
+        assert body["text"] not in json.dumps(repository.load_session(db, initial["session_id"]))
+        assert body["text"] not in repository.cached_request(db, initial["session_id"], body["request_id"])["response"]
+    with TestClient(create_app(repository=repository)) as client:
+        assert client.get(url).json()["events"] == []
+        assert client.get(f"/api/v1/sessions/{initial['session_id']}").status_code == 200
+    service = v1_app.state.conversation
+    service.clock = lambda: 10**12
+    assert v1.client.get(url).status_code == 410
+    service._prune_audits()
+    assert not service._audits
+
+
+def test_support_continuation_and_end_clear_current_draft_and_raw_evidence(v1):
+    v1.send("start")
+    v1.propose("support")
+    assert "cannot contact" in v1.snapshot["assistant_message"]
+    assert v1.snapshot["allowed_actions"] == ["resume", "end"]
+    v1.send("resume")
+    v1.propose()
+    v1.confirm()
+    body = v1.body()
+    url = f"/api/v1/sessions/{v1.snapshot['session_id']}"
+    response = v1.client.request("DELETE", url, json=body, headers={"Idempotency-Key": body["request_id"]})
+    assert response.status_code == 200
+    ended = response.json()
+    assert ended["state"] == "ENDED" and ended["confirmed_answers"] == []
+    audit = v1.client.get(url + "/audit").json()
+    assert [e["event_type"] for e in audit["events"]] == ["ended"]
+
+
+def test_pause_works_for_a_persisted_session_from_the_earlier_v1_bridge(v1, repository):
+    initial = v1.send("start")
+    with repository.transaction() as db:
+        state = repository.load_session(db, initial["session_id"])
+        state["actions"] = []  # Earlier ASKING snapshots had only message support.
+        repository.store_session(db, initial["session_id"], state)
+    assert v1.send("pause")["state"] == "PAUSED"
+    assert v1.send("resume")["active_question"] == initial["active_question"]

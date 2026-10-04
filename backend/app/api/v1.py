@@ -6,7 +6,7 @@ from fastapi import APIRouter, Header, Request
 from ..errors import ConversationError
 from ..schemas.v1 import (
     ConfirmationCommand, CorrectionCommand, FinalizeCommand, MessageCommand,
-    SessionCommand, SessionSnapshot,
+    SessionCommand, SessionSnapshot, AuditSnapshot,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["sessions-v1"])
@@ -51,3 +51,26 @@ def finalize(session_id: str, body: FinalizeCommand, request: Request, idempoten
 def correct(session_id: str, body: CorrectionCommand, request: Request, idempotency_key: Key):
     check_key(body, idempotency_key)
     return request.app.state.conversation.send_v1("change", body, session_id)
+
+
+@router.post("/sessions/{session_id}/pause", response_model=SessionSnapshot)
+def pause(session_id: str, body: SessionCommand, request: Request, idempotency_key: Key):
+    check_key(body, idempotency_key)
+    return request.app.state.conversation.send_v1("pause", body, session_id)
+
+
+@router.post("/sessions/{session_id}/resume", response_model=SessionSnapshot)
+def resume(session_id: str, body: SessionCommand, request: Request, idempotency_key: Key):
+    check_key(body, idempotency_key)
+    return request.app.state.conversation.send_v1("resume", body, session_id)
+
+
+@router.delete("/sessions/{session_id}", response_model=SessionSnapshot)
+def end(session_id: str, body: SessionCommand, request: Request, idempotency_key: Key):
+    check_key(body, idempotency_key)
+    return request.app.state.conversation.send_v1("end", body, session_id)
+
+
+@router.get("/sessions/{session_id}/audit", response_model=AuditSnapshot)
+def audit(session_id: str, request: Request):
+    return request.app.state.conversation.audit_v1(session_id)

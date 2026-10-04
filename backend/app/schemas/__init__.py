@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=8000)]
 Identifier = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_.:-]{1,128}$")]
-ActionId = Literal["start", "message", "confirm", "change", "not_sure", "save", "edit", "resume"]
+ActionId = Literal["start", "message", "confirm", "change", "not_sure", "save", "edit", "resume", "pause", "end", "explain_review"]
 
 
 class Schema(BaseModel):
@@ -60,7 +60,7 @@ class Proposal(Answer):
 
 
 class Action(Schema):
-    id: Literal["confirm", "change", "not_sure", "save", "edit", "resume"]
+    id: Literal["confirm", "change", "not_sure", "save", "edit", "resume", "pause", "end", "explain_review"]
     label: Text
     questionId: Identifier | None = None
     optionId: Identifier | None = None
@@ -76,7 +76,7 @@ class ConversationResponse(Schema):
     sessionId: Identifier
     revision: int = Field(ge=1)
     assistant: AssistantMessage
-    type: Literal["message", "clarification", "proposed_answer", "final_playback", "saved", "pause", "support"]
+    type: Literal["message", "clarification", "proposed_answer", "final_playback", "saved", "pause", "support", "ended"]
     canMessage: bool
     proposal: Proposal | None = None
     actions: list[Action] = Field(default_factory=list)
@@ -124,6 +124,9 @@ class Catalog(Schema):
 class RetrievedContext(Schema):
     sourceId: Identifier
     text: Text
+    source_sheet: Text | None = None
+    source_row: int | None = Field(default=None, gt=0)
+    retrieval_method: Text | None = None
 
 
 class Interpretation(Schema):

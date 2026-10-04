@@ -25,6 +25,7 @@ def adapter(handler):
 
 def interpret(model):
     catalog = TestCatalogProvider().load()
+    catalog.questions[0].requiresExplicitConfirmation = True
     return model.interpret(text="Synthetic test answer", question=catalog.questions[0], catalog=catalog,
                            confirmed_answers=[], context=[RetrievedContext(sourceId="source", text="Test context")])
 
@@ -35,7 +36,13 @@ def test_request_uses_server_auth_and_strict_json_interpretation():
         assert request.headers["authorization"] == "Bearer test-key"
         body = json.loads(request.content)
         assert body["model"] == "test-model" and body["stream"] is False
-        assert body["response_format"] == {"type": "json_object"}
+        if body["response_format"]["type"] == "json_object":
+            assert body["max_tokens"] == 64
+            return httpx.Response(200, json=completion('{"supported":true}'))
+        schema = body["response_format"]["json_schema"]["schema"]
+        assert body["response_format"]["type"] == "json_schema"
+        assert schema["enum"] == [{"kind": "proposal", "optionId": "a"}, {"kind": "proposal", "optionId": "b"},
+                                  {"kind": "clarification"}, {"kind": "pause"}, {"kind": "support"}]
         assert body["chat_template_kwargs"] == {"enable_thinking": False}
         assert "test-key" not in request.content.decode()
         data = json.loads(body["messages"][1]["content"])
@@ -92,9 +99,60 @@ def test_exact_model_identifier_is_verified():
         adapter(lambda req: httpx.Response(200, json={"data": [{"id": "wrong-model"}]})).check_model()
 
 
+@pytest.mark.parametrize("guard,expected", [('{"supported":true}', "proposal"), ('{"supported":false}', "clarification")])
+def test_semantic_guard_never_substitutes_another_option(guard, expected):
+    def handle(request):
+        body = json.loads(request.content)
+        if body["max_tokens"] == 64:
+            data = json.loads(body["messages"][1]["content"])
+            assert data["proposed_answer"] == "Test choice A"
+            return httpx.Response(200, json=completion(guard))
+        return httpx.Response(200, json=completion('{"kind":"proposal","optionId":"a"}'))
+    result = interpret(adapter(handle))
+    assert result.kind == expected
+    assert result.optionId == ("a" if expected == "proposal" else None)
+
+
+def test_malformed_semantic_guard_cannot_release_a_proposal():
+    def handle(request):
+        content = '{"supported":"true"}' if json.loads(request.content)["max_tokens"] == 64 else '{"kind":"proposal","optionId":"a"}'
+        return httpx.Response(200, json=completion(content))
+    with pytest.raises(IntegrationUnavailable):
+        interpret(adapter(handle))
+
+
+@pytest.mark.parametrize("reply,option_id", [
+    ("I may need it in three years.", "Q6_D"),
+    ("Actually, I may need it in five years.", "Q6_E"),
+    ("I may need it in ten years.", "Q6_F"),
+    ("six months", "Q6_B"), ("one year", "Q6_C"),
+])
+def test_duration_boundaries_use_authored_options_without_mutating_catalog(reply, option_id):
+    from backend.app.catalog.provider import JsonCatalogProvider
+    from pathlib import Path
+    catalog = JsonCatalogProvider(Path(__file__).resolve().parents[2] / "data/catalog/catalog-v2").load()
+    question = catalog.questions[5]
+    original = question.model_dump()
+    options = OmlxAdapter._duration_options(reply, question)
+    assert [o.id for o in options] == [option_id, "Q6_U"]
+    assert question.model_dump() == original
+
+
+@pytest.mark.parametrize("reply", [
+    "I may need it in three or five years.", "I need it in less than five years.",
+    "I won't need it for five years.", "My daughter is five years old and I need to invest.",
+])
+def test_duration_filter_does_not_invent_an_exact_horizon(reply):
+    from backend.app.catalog.provider import JsonCatalogProvider
+    from pathlib import Path
+    question = JsonCatalogProvider(Path(__file__).resolve().parents[2] / "data/catalog/catalog-v2").load().questions[5]
+    assert OmlxAdapter._duration_options(reply, question) == question.options
+
+
 def test_model_assisted_demo_uses_natural_language_and_retains_confirmation(repository):
     model = adapter(lambda req: httpx.Response(200, json=completion(
-        '{"kind":"proposal","optionId":"some_fluctuation"}',
+        '{"supported":true}' if json.loads(req.content)["max_tokens"] == 64
+        else '{"kind":"proposal","optionId":"some_fluctuation"}',
     )))
     with TestClient(create_app(repository=repository, model=model, demo_catalog=True)) as client:
         journey = Journey(client)

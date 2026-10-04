@@ -275,6 +275,19 @@ describe("versioned HTTP integration", () => {
 });
 
 describe("configuration and recovery", () => {
+  it("does not treat unavailable evidence as proof that the session expired", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 404 })),
+    );
+    await expect(
+      createHttpAdapter().audit("fictional-session"),
+    ).rejects.toMatchObject({
+      code: "ENDPOINT_UNAVAILABLE",
+      message:
+        "Evidence is unavailable. This does not mean your conversation has expired.",
+    });
+  });
   it("requires an explicit supported mode instead of silently using demo data", () => {
     expect(createAdapter("demo").mode).toBe("demo");
     expect(createAdapter("http").mode).toBe("http");

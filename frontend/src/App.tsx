@@ -320,13 +320,13 @@ export default function App({ adapter }: { adapter: Adapter }) {
               <section className="start-panel">
                 <h2>A conversation you can check.</h2>
                 <p>
-                  Choose a fixed answer or reply in your own words. Every
+                  Reply in your own words. Every
                   answer, including “Not sure”, needs your confirmation. You can
                   ask for an explanation, change an answer, pause or end.
                 </p>
                 <p>
-                  Draft answers stay in a temporary session until you accept the
-                  final profile. Model software may retain caches or logs; the
+                  Draft/session state is stored in SQLite. A profile is accepted
+                  only after your final review. Model software may retain caches or logs; the
                   team must verify its retention settings.
                 </p>
                 <button className="primary" onClick={start}>
@@ -540,8 +540,9 @@ export default function App({ adapter }: { adapter: Adapter }) {
                       <p className="eyebrow">PAUSED · NOTHING ACCEPTED</p>
                       <h3>Room to think.</h3>
                       <p>
-                        Your confirmed answers remain in this temporary session.
-                        Any unconfirmed proposal has been cleared.
+                        {snapshot.assistant_message} Resuming restores your
+                        question, proposal or review. No answer is confirmed
+                        automatically.
                       </p>
                       <button
                         className="primary"
@@ -555,10 +556,7 @@ export default function App({ adapter }: { adapter: Adapter }) {
                   {snapshot.state === "ENDED" && (
                     <section className="start-panel">
                       <h3>Conversation ended.</h3>
-                      <p>
-                        The service confirmed that temporary session data was
-                        cleared.
-                      </p>
+                      <p>{snapshot.assistant_message}</p>
                       <button onClick={reset}>Start a new conversation</button>
                     </section>
                   )}
@@ -704,7 +702,7 @@ export default function App({ adapter }: { adapter: Adapter }) {
                 This browser keeps the conversation only in memory. Refreshing
                 loses access to the session.{" "}
                 {snapshot?.retention_notice ??
-                  "Backend session expiry and model-server caches or logs must be checked by the team before making broader retention claims."}
+                  "The backend stores draft/session state and retry records in SQLite. Raw evidence is bounded in server memory and disappears on expiry, restart or eviction. Model-server caches or logs have separate retention settings."}
               </p>
             </section>
             {snapshot &&
@@ -741,7 +739,7 @@ export default function App({ adapter }: { adapter: Adapter }) {
           }
           label={
             dialog === "end"
-              ? "End and clear temporary session"
+              ? "End conversation"
               : active
                 ? "End current session"
                 : "Return to start"
@@ -757,7 +755,7 @@ export default function App({ adapter }: { adapter: Adapter }) {
         >
           <p>
             {active
-              ? "This discards the temporary conversation and answers once the service confirms. A save already in progress may still complete."
+              ? "This ends the current conversation and clears current draft answers and raw evidence. SQLite retry records and accepted profiles are retained. A save already in progress may still complete."
               : "This clears the screen. Any profile already saved by the service will remain saved."}
           </p>
         </ConfirmDialog>

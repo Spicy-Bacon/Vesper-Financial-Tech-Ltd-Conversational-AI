@@ -97,6 +97,34 @@ class FindingSnapshot(Schema):
     explanation: Text
 
 
+class AuditEvent(Schema):
+    event_id: Identifier
+    at: Text
+    question_id: Identifier | None
+    event_type: Literal["started", "proposed", "confirmed", "corrected", "message", "paused", "resumed", "accepted", "ended"]
+    raw_reply: str | None
+    catalog_version: Text
+    retrieval_method: Text
+    snippets: list[SnippetSnapshot]
+    model_action: str | None
+    proposal_id: str | None
+    option_id: str | None
+    validation_result: Text
+    state_before: Text
+    state_after: Text
+    latency_ms: float = Field(ge=0)
+    model_id: str | None
+    synthetic: bool
+
+
+class AuditSnapshot(Schema):
+    session_id: Identifier
+    events: list[AuditEvent]
+    retention_notice: Text
+    source_workbook: Text | None = None
+    source_sha256: Text | None = None
+
+
 class SessionSnapshot(Schema):
     session_id: Identifier
     revision: int = Field(ge=0)
@@ -120,6 +148,7 @@ class SessionSnapshot(Schema):
     receipt: ProfileSnapshot | None
     explanations: list[SnippetSnapshot] = Field(default_factory=list)
     findings: list[FindingSnapshot] = Field(default_factory=list)
+    retention_notice: Text = "Draft/session state and retry records are stored in SQLite. Raw evidence is bounded in server memory, expires with the session and is lost on restart or eviction. Ending clears current draft answers and raw evidence; it does not purge SQLite retry records or accepted profiles."
 
 
 def frontend_catalog(catalog: Catalog) -> None:
@@ -172,10 +201,10 @@ def snapshot_for(session_id: str, state: dict) -> SessionSnapshot:
         )
         stage, actions = "AWAITING_CONFIRMATION", ["confirm", "change"]
     elif state["type"] in {"pause", "support"}:
-        stage, actions = "PAUSED", []
+        stage, actions = "PAUSED", ["resume", "end"]
         active = None
     elif state["type"] == "final_playback":
-        stage, actions = "REVIEW", ["finalize"]
+        stage, actions = "REVIEW", ["finalize", "change", "explain_review", "message", "pause", "end"]
         active = None
         review_version = state["reviewVersion"]
         review = ReviewSnapshot(statements=answers, help_text=state["assistantMessage"])
@@ -192,9 +221,14 @@ def snapshot_for(session_id: str, state: dict) -> SessionSnapshot:
             answers=[answer(a.model_dump(mode="json")) for a in profile.answers],
             score=profile.score,
         )
+    elif state["type"] == "ended":
+        stage, actions = "ENDED", []
+        active = None
     else:
         stage = "ASKING"
         actions = ["message"] if state["canMessage"] else []
+    if stage in {"ASKING", "AWAITING_CONFIRMATION"}:
+        actions += ["pause", "end"]
     return SessionSnapshot(
         session_id=session_id, revision=state["revision"], catalog_version=catalog.version,
         catalog_status="approved" if catalog.financeApproved and not catalog.demo else "provisional",

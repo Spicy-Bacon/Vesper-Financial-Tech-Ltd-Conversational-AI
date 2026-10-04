@@ -201,6 +201,7 @@ export const auditEventSchema = z.object({
     "paused",
     "resumed",
     "accepted",
+    "ended",
   ]),
   raw_reply: z.string().nullable(),
   catalog_version: text,
@@ -219,6 +220,9 @@ export const auditEventSchema = z.object({
 export const auditSchema = z.object({
   session_id: text,
   events: z.array(auditEventSchema),
+  retention_notice: text.optional(),
+  source_workbook: text.nullable().optional(),
+  source_sha256: text.nullable().optional(),
 });
 export type Snapshot = z.infer<typeof snapshotSchema>;
 export type Question = z.infer<typeof questionSchema>;

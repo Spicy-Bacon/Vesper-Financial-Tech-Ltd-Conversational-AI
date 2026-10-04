@@ -77,11 +77,15 @@ export function createHttpAdapter(timeoutMs = 35000): Adapter {
             "The session changed. Refresh its state before continuing.",
           );
         if (response.status === 404 || response.status === 410) {
-          const sessionRequest = url.startsWith("/api/v1/sessions/");
+          const evidenceRequest = url.endsWith("/audit");
+          const sessionRequest =
+            url.startsWith("/api/v1/sessions/") && !evidenceRequest;
           throw new ServiceError(
             sessionRequest
               ? "This session is no longer available. You can return to the start screen. A save already sent to the service may have completed."
-              : "The requested service endpoint is unavailable. Check the backend configuration.",
+              : evidenceRequest
+                ? "Evidence is unavailable. This does not mean your conversation has expired."
+                : "The requested service endpoint is unavailable. Check the backend configuration.",
             sessionRequest ? "SESSION_UNAVAILABLE" : "ENDPOINT_UNAVAILABLE",
             response.status,
           );
